@@ -5,11 +5,11 @@ import wandb
 from wandb.keras import WandbCallback
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
+from tensorflow import keras
 def do_train(
         cfg,
         model,
         data,
-        run,
 ):
 
     epochs = cfg.SOLVER.MAX_EPOCHS
@@ -19,10 +19,11 @@ def do_train(
     logger.info("Start training")
 
     timestamp = datetime.datetime.now().strftime("%d%m%Y%H%M")
+    model_name = f'{cfg.MODEL.NAME}_{timestamp}.h5'
     tensorboard = TensorBoard(log_dir=f"logs/{cfg.MODEL.NAME}_{timestamp}")
-
-    filepath = f"models/{cfg.MODEL.NAME}_{timestamp}.h5" 
-
+    
+    filepath = f"models/{model_name}" 
+    
     checkpoint = ModelCheckpoint(
         filepath=filepath,
         save_weights_only=True,
@@ -33,7 +34,7 @@ def do_train(
     earlyStopping =  EarlyStopping(
         monitor='val_accuracy',
         min_delta=0,
-        patience=5,
+        patience=7,
         verbose=0,
         mode='auto',
         baseline=None,
@@ -48,12 +49,12 @@ def do_train(
         validation_data=(X_test_seq, y_test_seq),
         callbacks=[tensorboard, checkpoint, WandbCallback(), earlyStopping]
     )
-
-    trained_model_artifact = wandb.Artifact(
-        cfg.MODEL.NAME, 
-        type='model')
-    trained_model_artifact.add_dir(filepath)
-    run.log_artifact(trained_model_artifact)
+    #model = keras.models.load_model(filepath)
+    # trained_model_artifact = wandb.Artifact(
+    #     model_name, 
+    #     type='model')
+    # trained_model_artifact.add_dir('models/')
+    # run.log_artifact(trained_model_artifact)
     logger.info('Finished Training')
     logger.info('Saving model ...')
 
