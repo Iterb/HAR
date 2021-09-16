@@ -11,6 +11,7 @@ from config import cfg
 from data.dataset import Dataset
 from engine.trainer import do_train
 from engine.inference import do_test
+from engine.summarize import summarize
 from modeling.single_LSTM import SingleLSTM
 
 from utils.logger import setup_logger
@@ -28,12 +29,16 @@ def train(cfg):
         cfg,
         model,
         data,
-        run
     )
     score = do_test(
         cfg,
         model,
         data 
+    )
+    summarize(
+        cfg,
+        model,
+        data,
     )
 
 
