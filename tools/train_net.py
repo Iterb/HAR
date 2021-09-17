@@ -22,8 +22,13 @@ def train(cfg):
     run = setup_wandb_logger(cfg)
     dataset = Dataset(cfg)
     data = dataset.create_test_train_sets()
-    X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
-    model = SingleLSTM.build_model(X_train_seq.shape[1], X_train_seq.shape[2], y_train_seq.shape[1], cfg)
+    if cfg.MODEL.ARCH == "single":
+        X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
+        model = SingleLSTM.build_model(X_train_seq.shape[1], X_train_seq.shape[2], y_train_seq.shape[1], cfg)
+    elif cfg.MODEL.ARCH == 'double':
+        pass
+    elif cfg.MODEL.ARCH == 'triple':
+            pass    
 
     model = do_train(
         cfg,
