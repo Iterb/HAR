@@ -1,7 +1,7 @@
 
 import tensorflow as tf
 from tensorflow.keras.models import Sequential, Model
-from tensorflow.keras.layers import Dense, Dropout, LSTM, Input, Concatenate
+from tensorflow.keras.layers import Dense, Dropout, LSTM, Input, concatenate
 import sys 
 sys.path.append('.')
 class DoubleLSTM():
@@ -25,7 +25,7 @@ class DoubleLSTM():
         dropout23 = Dropout(cfg.MODEL.DROPOUT_RATE) (lstm23)
 
 
-        concat = Concatenate([dropout13, dropout23])
+        concat = concatenate([dropout13, dropout23])
 
         dense = Dense(100, activation= 'relu') (concat)
         output = Dense(n_outputs, activation='softmax') (dense)

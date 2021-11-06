@@ -1,15 +1,15 @@
 # encoding: utf-8
-
+import json
 import argparse
 import os
 import sys
 from os import mkdir
-
+import wandb
 
 sys.path.append('.')
 from config import cfg
 from data.dataset import Dataset
-from engine.trainer import do_train
+from engine.sweeper import do_sweep
 from engine.inference import do_test
 from engine.summarize import summarize
 from modeling import SingleLSTM, DoubleLSTM
@@ -17,7 +17,8 @@ from modeling import SingleLSTM, DoubleLSTM
 from utils.logger import setup_logger
 from utils.wandblog import setup_wandb_logger
 
-def train(cfg):
+
+def train():
     
     run = setup_wandb_logger(cfg)
     dataset = Dataset(cfg)
@@ -29,9 +30,9 @@ def train(cfg):
         X_train_seq_per1, X_train_seq_per2, y_train_seq, X_test_seq_per1, X_test_seq_per2, y_test_seq = data
         model = DoubleLSTM.build_model(X_train_seq_per1.shape[1], X_train_seq_per2.shape[2], y_train_seq.shape[1], cfg)
     elif cfg.MODEL.ARCH == 'triple':
-            pass 
+            pass    
 
-    model = do_train(
+    do_sweep(
         cfg,
         model,
         data,
@@ -41,11 +42,11 @@ def train(cfg):
         model,
         data 
     )
-    summarize(
-        cfg,
-        model,
-        data,
-    )
+    # summarize(
+    #     cfg,
+    #     model,
+    #     data,
+    # )
 
 
 def main():
@@ -81,7 +82,12 @@ def main():
             logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
-    train(cfg)
+    with open("sweep_conf/sweep_conf.json", "r") as f:
+        sweep_config = json.load(f)
+
+
+    sweep_id = wandb.sweep(sweep_config, project='human_activity_recognition')
+    wandb.agent(sweep_id, function=train)
 
 
 if __name__ == '__main__':

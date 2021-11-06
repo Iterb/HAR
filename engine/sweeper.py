@@ -1,16 +1,18 @@
 import logging
 import numpy as np
 import datetime
+import json
 import wandb
 from wandb.keras import WandbCallback
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
 from tensorflow import keras
-def do_train(
+def do_sweep(
         cfg,
         model,
         data,
-):
+):  
+
 
     epochs = cfg.SOLVER.MAX_EPOCHS
     batch_size = cfg.SOLVER.BATCH_SIZE
@@ -27,12 +29,12 @@ def do_train(
     checkpoint = ModelCheckpoint(
         filepath=filepath,
         save_weights_only=True,
-        monitor='val_acc',
+        monitor='val_accuracy',
         mode='max',
         save_best_only=True)
 
     earlyStopping =  EarlyStopping(
-        monitor='val_acc',
+        monitor='val_accuracy',
         min_delta=0,
         patience=7,
         verbose=0,
@@ -68,7 +70,6 @@ def do_train(
             validation_data=([X_test_seq_per1, X_test_seq_per2, X_test_dist_seq], y_test_seq),
             callbacks=[tensorboard, checkpoint, WandbCallback(), earlyStopping]
         ) 
-
     #model = keras.models.load_model(filepath)
     # trained_model_artifact = wandb.Artifact(
     #     model_name, 
@@ -77,6 +78,3 @@ def do_train(
     # run.log_artifact(trained_model_artifact)
     logger.info('Finished Training')
     logger.info('Saving model ...')
-
-
-    return model

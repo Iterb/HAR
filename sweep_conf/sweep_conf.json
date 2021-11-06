@@ -10,13 +10,16 @@
     },
     "parameters": {
         "batch_size": {
-            "values": [8, 16, 32, 64, 128, 256]
+            "values": [8, 16, 64, 128, 256]
         },
         "learning_rate":{
             "values": [0.01, 0.005, 0.001, 0.0005, 0.0001]
         },
-        "lin_size":{
-            "values": [35, 40, 45, 50, 55, 60]
+        "number_of_frames":{
+            "values": [10, 15, 20, 30, 40]
+        },
+        "dropout":{
+            "values": [0.2, 0.3, 0.4]
         }
     }
-  }
+}
