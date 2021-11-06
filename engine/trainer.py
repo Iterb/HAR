@@ -6,6 +6,7 @@ from wandb.keras import WandbCallback
 import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
 from tensorflow import keras
+import tf2onnx
 def do_train(
         cfg,
         model,
@@ -19,7 +20,7 @@ def do_train(
     logger.info("Start training")
 
     timestamp = datetime.datetime.now().strftime("%d%m%Y%H%M")
-    model_name = f'{cfg.MODEL.NAME}_{timestamp}.h5'
+    model_name = f'{cfg.MODEL.NAME}_{timestamp}'
     tensorboard = TensorBoard(log_dir=f"logs/{cfg.MODEL.NAME}_{timestamp}")
     
     filepath = f"models/{model_name}" 
@@ -27,12 +28,12 @@ def do_train(
     checkpoint = ModelCheckpoint(
         filepath=filepath,
         save_weights_only=True,
-        monitor='val_acc',
+        monitor='val_accuracy',
         mode='max',
         save_best_only=True)
 
     earlyStopping =  EarlyStopping(
-        monitor='val_acc',
+        monitor='val_accuracy',
         min_delta=0,
         patience=7,
         verbose=0,
@@ -77,6 +78,10 @@ def do_train(
     # run.log_artifact(trained_model_artifact)
     logger.info('Finished Training')
     logger.info('Saving model ...')
+    #model.save(filepath)
+    model_proto, _ = tf2onnx.convert.from_keras(model, opset=13, output_path=model_name + ".onnx")
+    output_names = [n.name for n in model_proto.graph.output]
+    print(output_names)
 
 
     return model
