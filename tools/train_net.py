@@ -10,7 +10,7 @@ sys.path.append('.')
 from config import cfg
 from data.dataset import Dataset
 from engine.trainer import do_train
-from engine.inference import do_test
+from engine.test import do_test
 from engine.summarize import summarize
 from modeling import SingleLSTM, DoubleLSTM
 

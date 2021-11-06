@@ -3,6 +3,7 @@
 import argparse
 import os
 import sys
+import subprocess
 from os import mkdir
 
 
@@ -11,7 +12,7 @@ sys.path.append('/openpose/examples/openpose-examples')
 from config import cfg
 from utils.logger import setup_logger
 from engine.estimate_pose import extract_pose_features_from_video
-
+from engine.inference import do_inference
 def arg_parser():
     parser = argparse.ArgumentParser(description="Keras training")
     parser.add_argument(
@@ -51,6 +52,7 @@ def main():
     #         logger.info(config_str)
 
     pose_features = extract_pose_features_from_video(cfg)
+    do_inference(cfg, pose_features)
     print(pose_features)
 
 
