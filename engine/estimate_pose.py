@@ -22,21 +22,24 @@ ANGLES = [(8,1,2),(1,2,3),(2,3,4),(8,1,5),(1,5,6),(5,6,7),(2,1,0),
           (1,8,9),(8,9,10),(9,10,11),(1,8,12),(8,12,13),(12,13,14)]
 
 def extract_pose_features_from_video(cfg: yacs.config.CfgNode) -> List[Type[pd.DataFrame]]:
-    print(type(cfg))
-    pose_frame_data = process_video(cfg.INFER.VIDEO_PATH)
-    pose_frame_data = np.array(pose_frame_data)
-    df_poses_list = create_df_for_each_person(pose_frame_data)
-    all_possible_interactions = itertools.combinations(df_poses_list, 2)
-    print(all_possible_interactions)
+    frames_intervals = sample_video(cfg.INFER.VIDEO_PATH, 
+                                    cfg.INFER.WINDOW_DURATION_S,
+                                    cfg.INFER.WINDOW_OFFSET_S)
     all_possible_features = []
-    for person_pose in all_possible_interactions:
-        print(person_pose[1])
-        all_possible_features.append(create_features(feature_type=cfg.INFER.FEATURES_TYPE,
-                                                     architecture_type=cfg.INFER.ARCH,
-                                                     person_1_pose=person_pose[0],
-                                                     person_2_pose=person_pose[1]))
+    for frame_interval in frames_intervals:
+        pose_frame_data = process_video(cfg.INFER.VIDEO_PATH, 
+                                        start_frame = np.min(frame_interval),
+                                        end_frame = np.max(frame_interval))
+        pose_frame_data = np.array(pose_frame_data)
+        df_poses_list = create_df_for_each_person(pose_frame_data)
+        all_possible_interactions = itertools.combinations(df_poses_list, 2)
+        for person_pose in all_possible_interactions:
+            all_possible_features.append(create_features(feature_type=cfg.INFER.FEATURES_TYPE,
+                                                        architecture_type=cfg.INFER.ARCH,
+                                                        person_1_pose=person_pose[0],
+                                                        person_2_pose=person_pose[1]))
     return all_possible_features
-def process_video(path: str) -> np.array:
+def process_video(path: str, start_frame: int, end_frame: int) -> np.array:
     """
     Estimate pose from video.
 
@@ -72,6 +75,9 @@ def process_video(path: str) -> np.array:
         params["face"] = False
         params["hand"] = False
         params["keypoint_scale"] = 3
+        #params["tracking"] = 0
+        #params["number_people_max"] = 2
+        #params["maximize_positives"] = True
 
         # Starting OpenPose
         opWrapper = op.WrapperPython()
@@ -80,29 +86,54 @@ def process_video(path: str) -> np.array:
         cap = cv2.VideoCapture(path)
 
         pose_frame_data = []
-
+        current_frame_number = -1
+        print(start_frame, end_frame)
         while(True):
             # Capture frame-by-frame
+            current_frame_number += 1
             ret, frame = cap.read()
+            if current_frame_number < start_frame:
+                continue
+            if current_frame_number >  end_frame: 
+                cv2.destroyAllWindows()
+                break
+
 
             datum = op.Datum()
             datum.cvInputData = frame
             opWrapper.emplaceAndPop(op.VectorDatum([datum]))
 
-            print("Body keypoints: \n" + str(datum.poseKeypoints))
-            print(datum.poseKeypoints.shape)
-            cv2.imshow("OpenPose 1.7.0 - Tutorial Python API", datum.cvOutputData)
-            if datum.poseKeypoints.shape[0] == 2: ## FIX THAT
-                pose_frame_data.append(datum.poseKeypoints)
+            #print("Body keypoints: \n" + str(datum.poseKeypoints))
+            #print(datum.poseKeypoints.shape)
+            #cv2.imshow("OpenPose 1.7.0 - Tutorial Python API", datum.cvOutputData)
+
+            if datum.poseKeypoints.shape[0] >= 2: ## FIX THAT
+                two_people_pose = datum.poseKeypoints[:2] ## FIX THAT
+                pose_frame_data.append(two_people_pose)
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
-
         cap.release()
 
     except Exception as e:
         print(e)
 
     return pose_frame_data
+
+
+def sample_video(path: str, duration_in_sec: int, interval_in_sec: int):
+    cap = cv2.VideoCapture(path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frame_number = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    duration_in_frames = duration_in_sec * fps
+    interval_in_frames = interval_in_sec * fps
+    #for interval_frames in enumerate(frame_number)
+    all_frames = np.arange(frame_number, dtype = np.int32)
+    max_intervals = ((frame_number - duration_in_frames) // interval_in_frames) + 1
+    frames_intervals = []
+    for i in range(int(max_intervals)):
+        frames_intervals.append(all_frames[int(interval_in_frames)*i:int(interval_in_frames)*i+int(duration_in_frames)])
+    return frames_intervals
+
 
 
 def create_df_for_each_person(pose_data: np.array) -> List[Type[pd.DataFrame]]:
@@ -117,12 +148,37 @@ def create_df_for_each_person(pose_data: np.array) -> List[Type[pd.DataFrame]]:
 
     return df_list
 
+
 def create_features(feature_type: int, architecture_type: str, person_1_pose: pd.DataFrame, person_2_pose: pd.DataFrame) -> pd.DataFrame:
     x = pd.concat([person_1_pose, person_2_pose], axis=1)
     x.columns = range(0,x.shape[1])
     features = normalize(x, feature_type, architecture_type)
 
     return features
+
+def calculate_stacked_preditions(window_duration: int, preds: list):
+    number_of_classes = 11
+    max_len = window_duration + len(preds) - 1
+
+    stacked_predictions = np.zeros([max_len,number_of_classes])
+    average_stacked_predictions = np.zeros([max_len,number_of_classes])
+
+    for dx, prediction in enumerate(preds):
+        for s in range(window_duration):
+            stacked_predictions[dx + s] += np.array(prediction).reshape(11)
+    for dx, sp in enumerate(stacked_predictions):
+        if dx <= window_duration - 1:
+            divider = dx + 1
+        elif dx >= len(preds):
+            divider = max_len - dx
+        else:
+            divider = window_duration
+
+        average_stacked_predictions[dx] = stacked_predictions[dx] / divider
+        print(divider)
+
+    return np.transpose(average_stacked_predictions)
+
 
 def calculate_angle(a, b, c):
   ba = a - b
@@ -312,7 +368,10 @@ def polar_coords2(x_coords_1, x_coords_2, average_norm):
                 a = 1
             else:
                 moving_avg_d = (sum(x_person_dist) + moving_avg_d) / (i + 1)  
-                d = np.linalg.norm(middle_point - frame2[i]) / norm
+                try:
+                    d = np.linalg.norm(middle_point - frame2[i]) / norm
+                except TypeError:
+                    d = moving_avg_d
                 vector = middle_point - frame2[i]
                 a = angle_between_vectors(norm_vector, vector)
             x_person_dist[i] = d
@@ -330,7 +389,6 @@ def normalize(x, feature_type = FEATURES_TYPE_1, architecture_type = SINGLE_LSTM
     av_angles = read_txt_to_list('/media/sebastian/STORAGE_HDD/data/average_angles.txt')
     av_norm = read_txt_to_list('/media/sebastian/STORAGE_HDD/data/average_norm.txt')
     av_limbs = read_txt_to_list('/media/sebastian/STORAGE_HDD/data/average_limbs.txt')
-    print(x)
     x  = x.drop(x.columns[2::3], axis=1)
     #spliting data
     x_per1 = x.drop(x.columns[50:], axis=1)

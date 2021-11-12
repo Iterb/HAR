@@ -11,8 +11,9 @@ sys.path.append('.')
 sys.path.append('/openpose/examples/openpose-examples')
 from config import cfg
 from utils.logger import setup_logger
-from engine.estimate_pose import extract_pose_features_from_video
+from engine.estimate_pose import extract_pose_features_from_video, calculate_stacked_preditions
 from engine.inference import do_inference
+from utils.vizualize import plot_probablites
 def arg_parser():
     parser = argparse.ArgumentParser(description="Keras training")
     parser.add_argument(
@@ -52,8 +53,17 @@ def main():
     #         logger.info(config_str)
 
     pose_features = extract_pose_features_from_video(cfg)
-    do_inference(cfg, pose_features)
-    print(pose_features)
+    preds = []
+    for keypoints in pose_features:
+        preds.append(do_inference(cfg, keypoints))
+    stacked_preds = calculate_stacked_preditions(
+        cfg.INFER.WINDOW_DURATION_S,
+        preds
+    )
+    print(stacked_preds)
+    print(stacked_preds.shape)
+    plot_probablites(stacked_preds)
+    print(np.sum(stacked_preds, axis=1))
 
 
 

@@ -8,6 +8,6 @@ docker run --rm -it\
 	--ipc=host \
 	--device=/dev/video0:/dev/video0 \
 	-v $(pwd):/workspace \
-	-v /media/sebastian/STORAGE_HDD3/data/:/media/sebastian/STORAGE_HDD/data/ \
+	-v /media/sebastian/STORAGE_HDD4/data/:/media/sebastian/STORAGE_HDD/data/ \
 	-w /workspace \
 	openpose:10.0-cudnn7-devel /bin/bash

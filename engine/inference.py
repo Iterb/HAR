@@ -22,22 +22,24 @@ def do_inference(
         cfg,
         data,
 ):
+
+
+    m = rt.InferenceSession(cfg.INFER.MODEL_PATH)
     features = preprocess(cfg, data)
     logger = logging.getLogger("model.infer")
     logger.info("Start inferencing")
-
-    m = rt.InferenceSession(cfg.INFER.MODEL_PATH)
     input_name = m.get_inputs()[0].name
     label_name = m.get_outputs()[0].name
-    onnx_pred = m.run([label_name], {input_name: features[0].astype(np.float32)})
+    features = features[0].astype(np.float32).reshape(-1, cfg.INFER.WINDOW_SIZE, 60)
+    onnx_pred = m.run([label_name], {input_name: features})
     class_dict = {0 : 'punch', 1 : 'kicking', 2 : 'pushing', 3 : 'pat on back', 4 : 'point finger',
-              5 : 'hugging', 6 : 'giving an object', 7 : 'touch pocket',
-              8 : 'shaking hands', 9 : 'walking towards', 10 : 'walking apart'}
+            5 : 'hugging', 6 : 'giving an object', 7 : 'touch pocket',
+            8 : 'shaking hands', 9 : 'walking towards', 10 : 'walking apart'}
     preds = np.argmax((onnx_pred), axis=2)
-    print(preds)
     for p in preds[0]:
-        print(class_dict[p])
+            print(class_dict[p])
     logger.info('Finished Testing')
+    return onnx_pred
 
 
 def preprocess(cfg, data):
@@ -45,14 +47,13 @@ def preprocess(cfg, data):
     imputer = load(open(f'sklearn/{cfg.MODEL.ARCH}_F{cfg.DATASETS.FEATURES_TYPE}_imputer.pkl', 'rb'))
     seq_type = 'linspace'
     if cfg.INFER.ARCH == SINGLE_LSTM:
-        features = data[0]
-        print(features.shape)
+        features = data
         features =  pd.DataFrame(imputer.transform(features), columns=features.columns, index=features.index)
         features = pd.DataFrame(scaler.transform(features), columns=features.columns, index=features.index)
         temporal_features = create_sequence_for_infer(cfg.INFER.WINDOW_SIZE, features, seq_type)
         return [temporal_features]
     if cfg.INFER.ARCH == DOUBLE_LSTM:
-        features_per1, features_per2 = data[0]
+        features_per1, features_per2 = data
         features_per1 =  pd.DataFrame(imputer.transform(features_per1), columns=features_per1.columns, index=features_per1.index)
         features_per1 = pd.DataFrame(scaler.transform(features_per1), columns=features_per1.columns, index=features_per1.index)
         features_per2 =  pd.DataFrame(imputer.transform(features_per2), columns=features_per2.columns, index=features_per2.index)
@@ -63,7 +64,7 @@ def preprocess(cfg, data):
     if cfg.INFER.ARCH == TRIPLE_LSTM:
         scaler_dist = load(open(f'sklearn/{cfg.MODEL.ARCH}_F{cfg.DATASETS.FEATURES_TYPE}_scaler_dist.pkl', 'rb'))
         imputer_dist = load(open(f'sklearn/{cfg.MODEL.ARCH}_F{cfg.DATASETS.FEATURES_TYPE}_imputer_dist.pkl', 'rb'))
-        features_per1, features_per2, dist = data[0]
+        features_per1, features_per2, dist = data
         features_per1 =  pd.DataFrame(imputer.transform(features_per1), columns=features_per1.columns, index=features_per1.index)
         features_per1 = pd.DataFrame(scaler.transform(features_per1), columns=features_per1.columns, index=features_per1.index)
         features_per2 =  pd.DataFrame(imputer.transform(features_per2), columns=features_per2.columns, index=features_per2.index)
@@ -84,12 +85,11 @@ def create_sequence_for_infer(window_size, df, seq_type):
         for i in df.values:
             prev_poses_data.append(i)
             if len(prev_poses_data) == window_size:
-                sequential_data.append(np.array(prev_poses_data))           
+                sequential_data.append(prev_poses_data)        
         return np.array(sequential_data)
     elif seq_type == 'linspace':
         sequential_data = []
         idx = np.round(np.linspace(0, len(df) - 1, window_size)).astype(int)
-        print(idx)
         df = df.iloc[idx, :].reset_index(drop=True)
         sequential_data.append(np.array(df))    
         return np.array(sequential_data)

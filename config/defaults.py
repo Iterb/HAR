@@ -7,7 +7,7 @@ _C = CN()
 
 _C.MODEL = CN()
 _C.MODEL.DROPOUT_RATE = 0.2
-_C.MODEL.ARCH = "double" # single/double/triple
+_C.MODEL.ARCH = "single" # single/double/triple
 _C.MODEL.NAME = "double_lstm_F3_full" 
 
 #_C.MODEL.CLASSES = ({'punch':0, 'kicking':1, 'pushing': 2, 'pat on back' : 3, 'point finger' : 4, 'hugging' : 5, 'giving an object' : 6, 'touch pocket' : 7, 'shaking hands' : 8, 'walking towards' : 9, 'walking apart' :10})
@@ -15,8 +15,8 @@ _C.MODEL.NAME = "double_lstm_F3_full"
 # Config definition
 # -----------------------------------------------------------------------------
 _C.SEQUENCE = CN()
-_C.SEQUENCE.WINDOW_SIZE = 45
-_C.SEQUENCE.LIN_SIZE = 55
+_C.SEQUENCE.WINDOW_SIZE = 40
+_C.SEQUENCE.LIN_SIZE = 40
 _C.SEQUENCE.LABEL_OFFSET = 0
 # -----------------------------------------------------------------------------
 # Dataset
@@ -52,10 +52,11 @@ _C.INFER = CN()
 _C.INFER.BATCH_SIZE = 1
 _C.INFER.FEATURES_TYPE = 3
 _C.INFER.ARCH = "single" 
-_C.INFER.WINDOW_SIZE = 15
-_C.INFER.VIDEO_PATH = ('/media/sebastian/STORAGE_HDD/data/tv_human_interactions_videos/handShake_0020.avi')
-
-
+_C.INFER.WINDOW_SIZE = 40
+_C.INFER.VIDEO_PATH = ('/media/sebastian/STORAGE_HDD/data/human_interaction/cropped_many_actions2.avi')
+_C.INFER.MODEL_PATH = ('/workspace/models/double_lstm_F3_full_061120212131.onnx')
+_C.INFER.WINDOW_DURATION_S = 3
+_C.INFER.WINDOW_OFFSET_S = 1
 # ---------------------------------------------------------------------------- #
 # Solver
 # ---------------------------------------------------------------------------- #
@@ -63,7 +64,7 @@ _C.SOLVER = CN()
 _C.SOLVER.OPTIMIZER_NAME = "Adam"
 _C.SOLVER.MAX_EPOCHS = 55
 _C.SOLVER.BASE_LR = 0.001
-_C.SOLVER.BATCH_SIZE = 64
+_C.SOLVER.BATCH_SIZE = 256
 
 _C.TEST = CN()
 _C.TEST.BATCH_SIZE = 1
