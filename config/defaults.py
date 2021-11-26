@@ -8,25 +8,25 @@ _C = CN()
 _C.MODEL = CN()
 _C.MODEL.DROPOUT_RATE = 0.2
 _C.MODEL.ARCH = "single" # single/double/triple
-_C.MODEL.NAME = "double_lstm_F3_full" 
+
 
 #_C.MODEL.CLASSES = ({'punch':0, 'kicking':1, 'pushing': 2, 'pat on back' : 3, 'point finger' : 4, 'hugging' : 5, 'giving an object' : 6, 'touch pocket' : 7, 'shaking hands' : 8, 'walking towards' : 9, 'walking apart' :10})
 # -----------------------------------------------------------------------------
 # Config definition
 # -----------------------------------------------------------------------------
 _C.SEQUENCE = CN()
-_C.SEQUENCE.WINDOW_SIZE = 40
-_C.SEQUENCE.LIN_SIZE = 40
+_C.SEQUENCE.WINDOW_SIZE = 25
+_C.SEQUENCE.LIN_SIZE = 25
 _C.SEQUENCE.LABEL_OFFSET = 0
 # -----------------------------------------------------------------------------
 # Dataset
 # -----------------------------------------------------------------------------
 _C.DATASETS = CN()
-_C.DATASETS.FEATURES_TYPE = 3
+_C.DATASETS.FEATURES_TYPE = 2
 # CSV of all key points in all videos from NTU dataset
 _C.DATASETS.FULL = ("/media/sebastian/STORAGE_HDD/data/rose_data_pc_2.csv") #
 _C.DATASETS.FEATURES_FULL = ("/media/sebastian/STORAGE_HDD/data/normalized_25P_short.csv")
-_C.DATASETS.FEATURES2_FULL = ("/home/sebastian/projects/HAR/polarcoords_pera.csv")
+_C.DATASETS.FEATURES2_FULL = ("polarcoords_pera.csv")
 _C.DATASETS.FEATURES3_FULL = ("/media/sebastian/STORAGE_HDD/data/polarcoords2_full.csv")
 # features for double LSTM
 _C.DATASETS.FEATURES_PER1_D = ("/media/sebastian/STORAGE_HDD/data/normalized_25P_short.csv")
@@ -53,10 +53,13 @@ _C.INFER.BATCH_SIZE = 1
 _C.INFER.FEATURES_TYPE = 3
 _C.INFER.ARCH = "single" 
 _C.INFER.WINDOW_SIZE = 40
-_C.INFER.VIDEO_PATH = ('/media/sebastian/STORAGE_HDD/data/human_interaction/cropped_many_actions2.avi')
+_C.INFER.VIDEO_PATH = ('/media/sebastian/STORAGE_HDD/data/human_interaction/cropped_many_actions3.avi')
 _C.INFER.MODEL_PATH = ('/workspace/models/double_lstm_F3_full_061120212131.onnx')
+_C.INFER.DO_TRACK = True
+_C.INFER.DO_SHOW = True
 _C.INFER.WINDOW_DURATION_S = 3
 _C.INFER.WINDOW_OFFSET_S = 1
+_C.INFER.OUTPUT_PATH = ('/workspace/output.avi')
 # ---------------------------------------------------------------------------- #
 # Solver
 # ---------------------------------------------------------------------------- #
@@ -74,3 +77,21 @@ _C.TEST.WEIGHT = ""
 # Misc options
 # ---------------------------------------------------------------------------- #
 _C.OUTPUT_DIR = "output"
+
+# ---------------------------------------------------------------------------- #
+# Openpose options
+# ---------------------------------------------------------------------------- #
+_C.OPENPOSE = CN()
+_C.OPENPOSE.MODELS_PATH = "/home/marcelo/openpose/models/"
+
+# ---------------------------------------------------------------------------- #
+# Tracker options
+# ---------------------------------------------------------------------------- #
+_C.TRACKER = CN()
+_C.TRACKER.MAX_COSINE_DISTANCE = 1
+_C.TRACKER.NN_BUDGET = None
+_C.TRACKER.NMS_MAX_OVERLAP = 1.0
+_C.TRACKER.MAX_AGE = 100
+_C.TRACKER.N_INIT = 20
+
+_C.MODEL.NAME = f"{_C.MODEL.ARCH}_F{_C.DATASETS.FEATURES_TYPE }_full" 

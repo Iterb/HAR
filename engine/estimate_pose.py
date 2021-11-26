@@ -1,3 +1,4 @@
+from pickle import FALSE
 from typing import Any, List, Type
 import sys
 import os
@@ -9,6 +10,10 @@ import numpy as np
 import cv2
 import pandas as pd
 import yacs
+
+from engine.tracker import Tracker
+from utils.utils import poses2boxes
+
 FEATURES_TYPE_1 = 1
 FEATURES_TYPE_2 = 2
 FEATURES_TYPE_3 = 3
@@ -20,16 +25,25 @@ LIMBS = [(1,2),(2,3),(3,4),(1,5),(5,6),(6,7),(0,1),(8,9),(9,10),(10,11),(8,12),(
 #direction - away from joint number 1 and then from down up
 ANGLES = [(8,1,2),(1,2,3),(2,3,4),(8,1,5),(1,5,6),(5,6,7),(2,1,0),
           (1,8,9),(8,9,10),(9,10,11),(1,8,12),(8,12,13),(12,13,14)]
+class pose_tracklet():
+    def __init__(self, id):
+        self.id = id
+        self.keypoints = []
 
-def extract_pose_features_from_video(cfg: yacs.config.CfgNode) -> List[Type[pd.DataFrame]]:
+def extract_pose_features_from_video(cfg: yacs.config.CfgNode,
+                                     save_output = False,
+                                     full_video = False) -> List[Type[pd.DataFrame]]:
     frames_intervals = sample_video(cfg.INFER.VIDEO_PATH, 
                                     cfg.INFER.WINDOW_DURATION_S,
                                     cfg.INFER.WINDOW_OFFSET_S)
     all_possible_features = []
+    if full_video:
+        frames_intervals = [[0, np.amax(frames_intervals)]]
     for frame_interval in frames_intervals:
-        pose_frame_data = process_video(cfg.INFER.VIDEO_PATH, 
-                                        start_frame = np.min(frame_interval),
-                                        end_frame = np.max(frame_interval))
+        pose_frame_data = process_video(cfg=cfg,
+                                        start_frame=np.min(frame_interval),
+                                        end_frame=np.max(frame_interval),
+                                        save_output=save_output)
         pose_frame_data = np.array(pose_frame_data)
         df_poses_list = create_df_for_each_person(pose_frame_data)
         all_possible_interactions = itertools.combinations(df_poses_list, 2)
@@ -39,7 +53,8 @@ def extract_pose_features_from_video(cfg: yacs.config.CfgNode) -> List[Type[pd.D
                                                         person_1_pose=person_pose[0],
                                                         person_2_pose=person_pose[1]))
     return all_possible_features
-def process_video(path: str, start_frame: int, end_frame: int) -> np.array:
+def process_video(cfg, start_frame: int, end_frame: int, 
+                  save_output: bool = False) -> np.array:
     """
     Estimate pose from video.
 
@@ -49,73 +64,100 @@ def process_video(path: str, start_frame: int, end_frame: int) -> np.array:
     Returns:
     keypoints -- keypoints of estimated pose.
     """
+    do_track = cfg.INFER.DO_TRACK
+    do_show = cfg.INFER.DO_SHOW
+    
+
+    # Import Openpose (Windows/Ubuntu/OSX)
+    dir_path = os.path.dirname(os.path.realpath(__file__))
     try:
-        # Import Openpose (Windows/Ubuntu/OSX)
-        dir_path = os.path.dirname(os.path.realpath(__file__))
-        try:
-            # Windows Import
-            if platform == "win32":
-                # Change these variables to point to the correct folder (Release/x64 etc.)
-                sys.path.append(dir_path + '/../../python/openpose/Release');
-                os.environ['PATH']  = os.environ['PATH'] + ';' + dir_path + '/../../x64/Release;' +  dir_path + '/../../bin;'
-                import pyopenpose as op
+        # Windows Import
+        if platform == "win32":
+            # Change these variables to point to the correct folder (Release/x64 etc.)
+            sys.path.append(dir_path + '/../../python/openpose/Release');
+            os.environ['PATH']  = os.environ['PATH'] + ';' + dir_path + '/../../x64/Release;' +  dir_path + '/../../bin;'
+            import pyopenpose as op
+        else:
+            # Change these variables to point to the correct folder (Release/x64 etc.)
+            sys.path.append('/openpose/build/python');
+            # If you run `make install` (default path is `/usr/local/python` for Ubuntu), you can also access the OpenPose/python module from there. This will install OpenPose and the python library at your desired installation path. Ensure that this is in your python path in order to use it.
+            # sys.path.append('/usr/local/python')
+            from openpose import pyopenpose as op
+    except ImportError as e:
+        print('Error: OpenPose library could not be found. Did you enable `BUILD_PYTHON` in CMake and have this Python script in the right folder?')
+        raise e
+
+    # Custom Params (refer to include/openpose/flags.hpp for more parameters)
+    params = dict()
+    params["model_folder"] = "/openpose/models/"
+    params["face"] = False
+    params["hand"] = False
+    params["keypoint_scale"] = 3
+    #params["tracking"] = 0
+    params["number_people_max"] = 2
+    #params["maximize_positives"] = True
+
+    # Starting OpenPose
+    opWrapper = op.WrapperPython()
+    opWrapper.configure(params)
+    opWrapper.start()
+    cap = cv2.VideoCapture(cfg.INFER.VIDEO_PATH)
+    if save_output:
+        out = cv2.VideoWriter(cfg.INFER.OUTPUT_PATH,
+            cv2.VideoWriter_fourcc(*'XVID'),
+            cap.get(cv2.CAP_PROP_FPS), 
+            (int(cap.get(3)), int(cap.get(4))))
+        
+    pose_frame_data = []
+    current_frame_number = -1
+    if do_track:
+        width  = int(cap.get(3)) # float `width`
+        height = int(cap.get(4))  # float `height`
+        tracker = Tracker(cfg, width, height)
+    print(start_frame, end_frame)
+    while(True):
+        # Capture frame-by-frame
+        current_frame_number += 1
+        ret, frame = cap.read()
+        if current_frame_number < start_frame:
+            continue
+        if current_frame_number >  end_frame: 
+            cv2.destroyAllWindows()
+            break
+
+        datum = op.Datum()
+        datum.cvInputData = frame
+        opWrapper.emplaceAndPop(op.VectorDatum([datum]))
+        currentFrame = datum.cvOutputData
+        if do_track:
+            tracks, currentFrame = tracker.run(datum)
+        if do_show:
+            if do_track:
+                for track in tracks:
+                    color = None
+                    if not track.is_confirmed():
+                        color = (0,0,255)
+                    else:
+                        color = (255,255,255)
+                    bbox = track.to_tlbr()
+                    print(bbox)
+                    cv2.rectangle(currentFrame, (int(bbox[0]), int(bbox[1])), 
+                                    (int(bbox[2]), int(bbox[3])),color, 2)
+                    cv2.putText(currentFrame, "id%s - ts%s"%(track.track_id,track.time_since_update),
+                                (int(bbox[0]), int(bbox[1])-20),0, 5e-3 * 200, (0,255,0),2)
+                cv2.imshow("OpenPose 1.7.0 - Tutorial Python API", currentFrame)
             else:
-                # Change these variables to point to the correct folder (Release/x64 etc.)
-                sys.path.append('/openpose/build/python');
-                # If you run `make install` (default path is `/usr/local/python` for Ubuntu), you can also access the OpenPose/python module from there. This will install OpenPose and the python library at your desired installation path. Ensure that this is in your python path in order to use it.
-                # sys.path.append('/usr/local/python')
-                from openpose import pyopenpose as op
-        except ImportError as e:
-            print('Error: OpenPose library could not be found. Did you enable `BUILD_PYTHON` in CMake and have this Python script in the right folder?')
-            raise e
-
-        # Custom Params (refer to include/openpose/flags.hpp for more parameters)
-        params = dict()
-        params["model_folder"] = "/openpose/models/"
-        params["face"] = False
-        params["hand"] = False
-        params["keypoint_scale"] = 3
-        #params["tracking"] = 0
-        #params["number_people_max"] = 2
-        #params["maximize_positives"] = True
-
-        # Starting OpenPose
-        opWrapper = op.WrapperPython()
-        opWrapper.configure(params)
-        opWrapper.start()
-        cap = cv2.VideoCapture(path)
-
-        pose_frame_data = []
-        current_frame_number = -1
-        print(start_frame, end_frame)
-        while(True):
-            # Capture frame-by-frame
-            current_frame_number += 1
-            ret, frame = cap.read()
-            if current_frame_number < start_frame:
-                continue
-            if current_frame_number >  end_frame: 
-                cv2.destroyAllWindows()
-                break
-
-
-            datum = op.Datum()
-            datum.cvInputData = frame
-            opWrapper.emplaceAndPop(op.VectorDatum([datum]))
-
-            #print("Body keypoints: \n" + str(datum.poseKeypoints))
-            #print(datum.poseKeypoints.shape)
-            #cv2.imshow("OpenPose 1.7.0 - Tutorial Python API", datum.cvOutputData)
-
-            if datum.poseKeypoints.shape[0] >= 2: ## FIX THAT
-                two_people_pose = datum.poseKeypoints[:2] ## FIX THAT
-                pose_frame_data.append(two_people_pose)
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
-        cap.release()
-
-    except Exception as e:
-        print(e)
+                cv2.imshow("OpenPose 1.7.0 - Tutorial Python API", currentFrame)
+        if datum.poseKeypoints.shape[0] >= 2: ## FIX THAT
+            two_people_pose = datum.poseKeypoints[:2] ## FIX THAT
+            pose_frame_data.append(two_people_pose)
+        if save_output:
+            out.write(currentFrame.astype('uint8'))
+        if cv2.waitKey(1) & 0xFF == ord('q'):
+            break
+    cap.release()
+    if save_output:
+        out.release()
 
     return pose_frame_data
 
@@ -156,28 +198,25 @@ def create_features(feature_type: int, architecture_type: str, person_1_pose: pd
 
     return features
 
-def calculate_stacked_preditions(window_duration: int, preds: list):
+def calculate_stacked_preditions(window_duration: int, window_offset: int,
+                                 preds: list):
     number_of_classes = 11
-    max_len = window_duration + len(preds) - 1
+    max_len = window_duration + window_offset * (len(preds) - 1)
 
     stacked_predictions = np.zeros([max_len,number_of_classes])
     average_stacked_predictions = np.zeros([max_len,number_of_classes])
-
+    divider = np.zeros([max_len])
     for dx, prediction in enumerate(preds):
         for s in range(window_duration):
-            stacked_predictions[dx + s] += np.array(prediction).reshape(11)
-    for dx, sp in enumerate(stacked_predictions):
-        if dx <= window_duration - 1:
-            divider = dx + 1
-        elif dx >= len(preds):
-            divider = max_len - dx
-        else:
-            divider = window_duration
+            stacked_predictions[dx * window_offset + s] += np.array(prediction).reshape(11)
+            divider[dx * window_offset + s] += 1
 
-        average_stacked_predictions[dx] = stacked_predictions[dx] / divider
-        print(divider)
+    average_stacked_predictions = np.divide(stacked_predictions, divider.reshape(-1,1))
 
-    return np.transpose(average_stacked_predictions)
+    print(divider)
+    print(np.sum(average_stacked_predictions))
+
+    return average_stacked_predictions
 
 
 def calculate_angle(a, b, c):
