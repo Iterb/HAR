@@ -1,7 +1,7 @@
 {
     "method": "bayes", 
     "metric": {
-        "name": "val_acc",
+        "name": "Best_val_acc",
         "goal": "minimize"
     },
     "early_terminate":{
@@ -19,13 +19,6 @@
             "distribution": "int_uniform",
             "min" : 10,
             "max": 55
-        },
-        "dropout":{
-            "values": [0.2, 0.3, 0.4]
-        },
-        "num_of_lstm_layers":{
-            "values": [1, 2, 3]
         }
-
     }
 }

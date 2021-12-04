@@ -18,15 +18,23 @@ chi2inv95 = {
     6: 12.592,
     7: 14.067,
     8: 15.507,
-    9: 16.919}
+    9: 16.919,
+}
 
 
 class MyKalmanFilter(object):
     """
     Constructor que recibe como parametro las transition_matrices, pero si no las recibe las genera por defecto
     """
-    def __init__(self, motion_mat = None, observation_mat = None, transition_covariance = None, observation_covariance = None):
-        ndim, dt = 4, 1.
+
+    def __init__(
+        self,
+        motion_mat=None,
+        observation_mat=None,
+        transition_covariance=None,
+        observation_covariance=None,
+    ):
+        ndim, dt = 4, 1.0
         if motion_mat is None:
             self.motion_mat = np.eye(2 * ndim, 2 * ndim)
             for i in range(ndim):
@@ -37,14 +45,15 @@ class MyKalmanFilter(object):
         if observation_mat is None:
             self.observation_mat = np.eye(ndim, 2 * ndim)
         else:
-            self.observation_mat = observation_mat 
+            self.observation_mat = observation_mat
         print(self.motion_mat)
         print(self.observation_mat)
-        self.kf = KalmanFilter(transition_matrices = self.motion_mat,
-            observation_matrices = self.observation_mat,
-            transition_covariance = transition_covariance,
-            observation_covariance = observation_covariance)
-
+        self.kf = KalmanFilter(
+            transition_matrices=self.motion_mat,
+            observation_matrices=self.observation_mat,
+            transition_covariance=transition_covariance,
+            observation_covariance=observation_covariance,
+        )
 
     def initiate(self, measurement):
         mean_pos = measurement
@@ -57,17 +66,17 @@ class MyKalmanFilter(object):
         return self.kf.filter_update(mean, covariance)
 
     def project(self, mean, covariance):
-        mean =  mean[:4]
-        covariance = np.linalg.multi_dot((
-            self.observation_mat, covariance, self.observation_mat.T))
+        mean = mean[:4]
+        covariance = np.linalg.multi_dot(
+            (self.observation_mat, covariance, self.observation_mat.T)
+        )
         return mean.filled(), covariance
 
     def update(self, mean, covariance, measurement):
         mean, covariance = self.kf.filter_update(mean, covariance, measurement)
         return mean, covariance
 
-    def gating_distance(self, mean, covariance, measurements,
-                        only_position=False):
+    def gating_distance(self, mean, covariance, measurements, only_position=False):
         """Compute gating distance between state distribution and measurements.
 
         A suitable distance threshold can be obtained from `chi2inv95`. If
@@ -103,7 +112,7 @@ class MyKalmanFilter(object):
         cholesky_factor = np.linalg.cholesky(covariance)
         d = measurements - mean
         z = scipy.linalg.solve_triangular(
-            cholesky_factor, d.T, lower=True, check_finite=False,
-            overwrite_b=True)
+            cholesky_factor, d.T, lower=True, check_finite=False, overwrite_b=True
+        )
         squared_maha = np.sum(z * z, axis=0)
         return squared_maha

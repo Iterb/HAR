@@ -7,81 +7,114 @@ import tensorflow as tf
 from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
 from tensorflow import keras
 import tf2onnx
+
+
 def do_train(
-        cfg,
-        model,
-        data,
+    cfg,
+    model,
+    data,
 ):
 
     epochs = cfg.SOLVER.MAX_EPOCHS
     batch_size = cfg.SOLVER.BATCH_SIZE
-    
+
     logger = logging.getLogger("model.train")
     logger.info("Start training")
 
     timestamp = datetime.datetime.now().strftime("%d%m%Y%H%M")
-    model_name = f'{cfg.MODEL.NAME}_{timestamp}'
+    model_name = f"{cfg.MODEL.NAME}_{timestamp}"
     tensorboard = TensorBoard(log_dir=f"logs/{cfg.MODEL.NAME}_{timestamp}")
-    
-    filepath = f"models/{model_name}" 
-    
+
+    filepath = f"models/{model_name}"
+
     checkpoint = ModelCheckpoint(
         filepath=filepath,
         save_weights_only=True,
-        monitor='val_accuracy',
-        mode='max',
-        save_best_only=True)
+        monitor="val_accuracy",
+        mode="max",
+        save_best_only=True,
+    )
 
-    earlyStopping =  EarlyStopping(
-        monitor='val_accuracy',
+    earlyStopping = EarlyStopping(
+        monitor="val_accuracy",
         min_delta=0,
         patience=7,
         verbose=0,
-        mode='auto',
+        mode="auto",
         baseline=None,
-        restore_best_weights=True
-)
+        restore_best_weights=True,
+    )
 
+    callbacks = [
+        tensorboard,
+        checkpoint,
+        WandbCallback(),
+        earlyStopping,
+        keras.callbacks.ReduceLROnPlateau(),
+    ]
     if cfg.MODEL.ARCH == "single":
         X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
         history = model.fit(
-            X_train_seq, y_train_seq,
+            X_train_seq,
+            y_train_seq,
             batch_size=batch_size,
             epochs=epochs,
             validation_data=(X_test_seq, y_test_seq),
-            callbacks=[tensorboard, checkpoint, WandbCallback(), earlyStopping]
+            callbacks=callbacks,
         )
-    elif cfg.MODEL.ARCH == 'double':
-        X_train_seq_per1, X_train_seq_per2, y_train_seq, X_test_seq_per1, X_test_seq_per2, y_test_seq = data
+    elif cfg.MODEL.ARCH == "double":
+        (
+            X_train_seq_per1,
+            X_train_seq_per2,
+            y_train_seq,
+            X_test_seq_per1,
+            X_test_seq_per2,
+            y_test_seq,
+        ) = data
         history = model.fit(
-            [X_train_seq_per1, X_train_seq_per2], y_train_seq,
+            [X_train_seq_per1, X_train_seq_per2],
+            y_train_seq,
             batch_size=batch_size,
             epochs=epochs,
             validation_data=([X_test_seq_per1, X_test_seq_per2], y_test_seq),
-            callbacks=[tensorboard, checkpoint, WandbCallback(), earlyStopping]
+            callbacks=callbacks,
         )
-    elif cfg.MODEL.ARCH == 'triple':
-        X_train_seq_per1, X_train_seq_per2, X_train_dist_seq, X_test_seq_per1, X_test_seq_per2, X_test_dist_seq, y_train_seq, y_test_seq= data
+    elif cfg.MODEL.ARCH == "triple":
+        (
+            X_train_seq_per1,
+            X_train_seq_per2,
+            X_train_dist_seq,
+            X_test_seq_per1,
+            X_test_seq_per2,
+            X_test_dist_seq,
+            y_train_seq,
+            y_test_seq,
+        ) = data
         history = model.fit(
-            [X_train_seq_per1, X_train_seq_per2, X_train_dist_seq], y_train_seq,
+            [X_train_seq_per1, X_train_seq_per2, X_train_dist_seq],
+            y_train_seq,
             batch_size=batch_size,
             epochs=epochs,
-            validation_data=([X_test_seq_per1, X_test_seq_per2, X_test_dist_seq], y_test_seq),
-            callbacks=[tensorboard, checkpoint, WandbCallback(), earlyStopping]
-        ) 
+            validation_data=(
+                [X_test_seq_per1, X_test_seq_per2, X_test_dist_seq],
+                y_test_seq,
+            ),
+            callbacks=callbacks,
+        )
 
-    #model = keras.models.load_model(filepath)
+    # model = keras.models.load_model(filepath)
     # trained_model_artifact = wandb.Artifact(
-    #     model_name, 
+    #     model_name,
     #     type='model')
     # trained_model_artifact.add_dir('models/')
     # run.log_artifact(trained_model_artifact)
-    logger.info('Finished Training')
-    logger.info('Saving model ...')
-    #model.save(filepath)
-    model_proto, _ = tf2onnx.convert.from_keras(model, opset=13, output_path=model_name + ".onnx")
+    logger.info("Finished Training")
+    logger.info("Saving model ...")
+    # model.save(filepath)
+    model_proto, _ = tf2onnx.convert.from_keras(
+        model, opset=13, output_path=model_name + ".onnx"
+    )
     output_names = [n.name for n in model_proto.graph.output]
     print(output_names)
-
 
     return model
