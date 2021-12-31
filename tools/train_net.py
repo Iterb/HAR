@@ -5,6 +5,7 @@ import os
 import sys
 from os import mkdir
 
+import wandb
 
 sys.path.append(".")
 from config import cfg
@@ -12,7 +13,7 @@ from data.dataset import Dataset
 from engine.trainer import do_train
 from engine.test import do_test
 from engine.summarize import summarize
-from modeling import SingleLSTM, DoubleLSTM
+from modeling import SingleLSTM, DoubleLSTM, ConvNet
 
 from utils.logger import setup_logger
 from utils.wandblog import setup_wandb_logger
@@ -25,7 +26,7 @@ def train(cfg):
     data = dataset.create_test_train_sets()
     if cfg.MODEL.ARCH == "single":
         X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
-        model = SingleLSTM.build_model(
+        model = SingleLSTM().build_model(
             X_train_seq.shape[1], X_train_seq.shape[2], y_train_seq.shape[1], cfg
         )
     elif cfg.MODEL.ARCH == "double":
@@ -45,6 +46,18 @@ def train(cfg):
         )
     elif cfg.MODEL.ARCH == "triple":
         pass
+    elif cfg.MODEL.ARCH == "convnet":
+        model = ConvNet.build_model(
+            (24, 24, wandb.config.number_of_frames, 1),
+            11,
+            cfg,
+        )
+    elif cfg.MODEL.ARCH == "3DCNN":
+        model = ConvNet.build_model(
+            (24, 24, wandb.config.number_of_frames, 1),
+            11,
+            cfg,
+        )
 
     model = do_train(
         cfg,

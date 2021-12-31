@@ -21,11 +21,12 @@ from utils.wandblog import setup_wandb_logger
 def train():
 
     run = setup_wandb_logger(cfg)
+    run.name = f"NL_{wandb.config.num_of_lstm_layers}_BS_{wandb.config.batch_size}_FR_{wandb.config.number_of_frames}_LR_{wandb.config.learning_rate}_DO_{wandb.config.dropout}_LS_{wandb.config.LSTM_size}"
     dataset = Dataset(cfg)
     data = dataset.create_test_train_sets()
     if cfg.MODEL.ARCH == "single":
         X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
-        model = SingleLSTM.build_model(
+        model = SingleLSTM().build_model(
             X_train_seq.shape[1], X_train_seq.shape[2], y_train_seq.shape[1], cfg
         )
     elif cfg.MODEL.ARCH == "double":
@@ -96,7 +97,7 @@ def main():
             logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
-    with open("sweep_conf/sweep_conf2.json", "r") as f:
+    with open("sweep_conf/sweep_conf3.json", "r") as f:
         sweep_config = json.load(f)
 
     try:

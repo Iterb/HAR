@@ -9,33 +9,35 @@ from tensorflow.keras.layers import (
     Dropout,
     Input,
     Conv3D,
+    Conv2D,
 )
-from tensorflow.keras.models import Model, Sequential
-
-sys.path.append(".")
-from config import cfg
-from data.dataset import Dataset
+from tensorflow.keras.models import Sequential
 
 
-class ConvNet:
-    """https://www.researchgate.net/publication/341116036_Two-Stage_Human_Activity_Recognition_Using_2D-ConvNet"""
+
+class 3DCNN:
+    """https://www.dbs.ifi.lmu.de/~yu_k/icml2010_3dcnn.pdf"""
 
     def build_model(input_shape, n_outputs, cfg):
         model = Sequential(
             [
                 Input(shape=input_shape),
-                Conv3D(8, kernel_size=(3, 3, 3), padding="same", activation="relu"),
+                Conv3D(
+                    46, kernel_size=(7, 7, 3), padding = 'valid', activation="relu"
+                ),
                 MaxPooling3D(pool_size=(2, 2, 1)),
-                Conv3D(12, kernel_size=(3, 3, 3), padding="same", activation="relu"),
-                MaxPooling3D(pool_size=(2, 2, 1)),
-                Conv3D(24, kernel_size=(3, 3, 3), padding="same", activation="relu"),
-                MaxPooling3D(pool_size=(2, 2, 1)),
+                Conv3D(
+                    46, kernel_size=(7 6, 3), padding = 'valid', activation="relu"
+                ),
+                MaxPooling3D(pool_size=(3, 3, 1)),
+                Conv2D(
+                    78, kernel_size=(3, 3), padding = 'same', activation="relu"
+                ),
                 Flatten(),
-                Dense(32, activation="relu"),
-                Dense(32, activation="relu"),
+                Dense(128, activation="relu"),
                 Dropout(0.5),
                 Dense(n_outputs, activation="softmax"),
-            ]
+            ]  
         )
 
         optimizer = getattr(tf.keras.optimizers, cfg.SOLVER.OPTIMIZER_NAME)

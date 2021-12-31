@@ -1,13 +1,20 @@
-import datetime
+import json
 import logging
+from typing import Dict
 
 import numpy as np
 import seaborn as sns
-import tensorflow as tf
 import wandb
 from sklearn.metrics import classification_report, confusion_matrix
 
+def create_wandb_table(classification_report: Dict[str, Dict[str, float]])->wandb.Table:
+    columns = ["class"] + list(classification_report['punch'].keys())
+    table = wandb.Table(columns=columns)
+    for _class, values in classification_report.items():
+        metric_values = list(values.keys())
+        table.add_data(_class, metric_values[0],metric_values[1],metric_values[2],metric_values[3])
 
+    return table
 def summarize(
     cfg,
     model,
@@ -73,6 +80,8 @@ def summarize(
     )
     images = wandb.Image(heatmap, caption="Top: Output, Bottom: Input")
     wandb.log({"Confusion_matrix": images})
-    # wandb.log({"Classification_report": report})
+    print(report)
+    wandb.log({"Classification_report_table":create_wandb_table(report)})
+    wandb.log({"Classification_report":report})
 
     logger.info("Got results")

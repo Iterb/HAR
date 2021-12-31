@@ -1,12 +1,16 @@
-import logging
-import numpy as np
 import datetime
-import wandb
-from wandb.keras import WandbCallback
+import logging
+import sys
+
+import numpy as np
 import tensorflow as tf
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
-from tensorflow import keras
 import tf2onnx
+import wandb
+from data.convnet_dataset import ConvnetDataloader, ConvnetDataset
+from data.skeletons_dataset import SkeletonDataset
+from tensorflow import keras
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
+from wandb.keras import WandbCallback
 
 
 def do_train(
@@ -101,7 +105,48 @@ def do_train(
             ),
             callbacks=callbacks,
         )
+    elif cfg.MODEL.ARCH == "convnet":
+        X_train, X_test, y_train, y_test = data
 
+        train_dataset = ConvnetDataset(
+            x_data=X_train,
+            y_data=y_train,
+            linspace_size=wandb.config.number_of_frames,
+        )
+        val_dataset = ConvnetDataset(
+            x_data=X_test,
+            y_data=y_test,
+            linspace_size=wandb.config.number_of_frames,
+        )
+        train_dataloader = ConvnetDataloader(
+            dataset=train_dataset, batch_size=wandb.config.batch_size, shuffle=True
+        )
+
+        val_dataloader = ConvnetDataloader(
+            dataset=val_dataset, batch_size=1, shuffle=False
+        )
+
+        history = model.fit(
+            train_dataloader,
+            batch_size=batch_size,
+            epochs=epochs,
+            validation_data=val_dataloader,
+            callbacks=callbacks,
+        )
+    elif cfg.MODEL.ARCH == "3DCNN":
+        train_instances = (
+            cfg.DATASETS.TRAIN_CAMERAS
+            if cfg.DATASETS.SPLIT_TYPE == "cv"
+            else cfg.DATASETS.TRAIN_SUBJECTS
+        )
+        train_dataset = SkeletonDataset(
+            linspace_size=wandb.config.number_of_frames,
+            imgs_root_dir=cfg.DATASETS.SKELETON_IMGS,
+            train_instances=train_instances,
+            data_split=cfg.DATASETS.SPLIT_TYPE,
+            train = False,
+        )
+        print(train_dataset[5])
     # model = keras.models.load_model(filepath)
     # trained_model_artifact = wandb.Artifact(
     #     model_name,

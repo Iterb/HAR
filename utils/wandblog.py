@@ -17,5 +17,6 @@ def setup_wandb_logger(cfg):
             "Test_train_split": cfg.DATASETS.SPLIT_TYPE,
             "dropout": cfg.MODEL.DROPOUT_RATE,
             "num_of_lstm_layers": cfg.MODEL.LSTM_LAYERS,
+            "LSTM_size": cfg.MODEL.LSTM_SIZE,
         },
     )

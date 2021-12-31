@@ -58,8 +58,6 @@ class Dataset:
         # features = features.drop(features.columns[0], axis=1)
 
         print("loaded csvs")
-        print(features.shape)
-        print(self.data.shape)
 
         df = pd.concat(
             [
@@ -70,7 +68,7 @@ class Dataset:
         )
         del features
         df = df.reset_index(drop=True)
-        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        # df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.interpolate(method="linear", inplace=True, axis=1)
 
         # print(df.shape)
@@ -84,48 +82,47 @@ class Dataset:
         elif self.cfg.DATASETS.SPLIT_TYPE == "cv":
             full_data_train = df.loc[
                 df["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
-            ].astype("float16")
+            ].astype("float32")
             full_data_test = df.loc[
                 ~df["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
-            ].astype("float16")
+            ].astype("float32")
         del df
         train_indices = np.unique(full_data_train["batch"])
         print("1")
         x_train = full_data_train.drop(
             ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        ).astype("float16")
+        ).astype("float32")
         # x_train = x_train.reset_index(drop=True)
-        x_train = x_train.rename(
-            columns={
-                x: y for x, y in zip(x_train.columns, range(0, len(x_train.columns)))
-            }
-        )
-        print(x_train.shape)
+        # x_train = x_train.rename(
+        #     columns=dict(zip(x_train.columns, range(len(x_train.columns))))
+        # ).reset_index(drop=True)
+
+        print(x_train)
+        print(x_train.columns)
+        print(x_train.isnull().sum())
         x_train = pd.DataFrame(
             self.imputer.fit_transform(x_train),
             columns=x_train.columns,
             index=x_train.index,
         )
-        print("2")
         x_train = pd.DataFrame(
             self.scaler.fit_transform(x_train),
             columns=x_train.columns,
             index=x_train.index,
         )
         x_train = pd.concat([x_train, full_data_train[["batch"]]], axis=1)
-        print("3")
+
         x_test = full_data_test.drop(
             ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
         ).astype("float16")
         # x_test = x_test.reset_index(drop=True)
         x_test = x_test.rename(
-            columns={
-                x: y for x, y in zip(x_test.columns, range(0, len(x_test.columns)))
-            }
+            columns=dict(zip(x_test.columns, range(len(x_test.columns))))
         )
+
         x_test = pd.DataFrame(
             self.imputer.transform(x_test), columns=x_test.columns, index=x_test.index
-        )  # prob only transform
+        )
         x_test = pd.DataFrame(
             self.scaler.transform(x_test), columns=x_test.columns, index=x_test.index
         )
@@ -497,8 +494,121 @@ class Dataset:
         )
 
         print("loaded csvs")
-        print(features.shape)
-        print(self.data.shape)
+
+        del features
+        df = df.reset_index(drop=True)
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.interpolate(method="linear", inplace=True, axis=1)
+
+        # print(df.shape)
+        if self.cfg.DATASETS.SPLIT_TYPE == "cs":
+            full_data_train = df.loc[
+                df["subject_id"].isin(self.cfg.DATASETS.TRAIN_SUBJECTS)
+            ].astype("float32")
+            full_data_test = df.loc[
+                ~df["subject_id"].isin(self.cfg.DATASETS.TRAIN_SUBJECTS)
+            ].astype("float32")
+        elif self.cfg.DATASETS.SPLIT_TYPE == "cv":
+            full_data_train = df.loc[
+                df["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
+            ].astype("float32")
+            full_data_test = df.loc[
+                ~df["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
+            ].astype("float32")
+        del df
+        train_indices = np.unique(full_data_train["batch"])
+        x_train = self._extracted_from__process_for_convnet_54("1", full_data_train)
+        x_train = self.scale_n_impute(full_data_train).drop(["batch"], axis=1)
+        img_size = 24
+        pad_size = (img_size ** 2 - 450) / 2
+        print(pad_size)
+        pad_size = 63
+        x_train_2D = x_train.apply(
+            lambda row: np.pad(row.to_numpy(), (pad_size, pad_size)).reshape(
+                img_size, img_size
+            ),
+            axis=1,
+        )
+
+        x_test = self._extracted_from__process_for_convnet_54("3", full_data_test)
+        x_test = self.scale_n_impute(full_data_test).drop(["batch"], axis=1)
+
+        x_test_2D = x_test.apply(
+            lambda row: np.pad(row.to_numpy(), (pad_size, pad_size)).reshape(
+                img_size, img_size
+            ),
+            axis=1,
+        )
+
+        y_train = (
+            full_data_train[["class", "batch"]]
+            .groupby("batch")["class"]
+            .max()
+            .to_frame()
+            .reset_index()
+        )
+        y_test = (
+            full_data_test[["class", "batch"]]
+            .groupby("batch")["class"]
+            .max()
+            .to_frame()
+            .reset_index()
+        )
+        print("processed data")
+
+        dump(
+            self.scaler,
+            open(
+                f"sklearn/{self.cfg.MODEL.ARCH}_F{self.cfg.DATASETS.FEATURES_TYPE}_scaler.pkl",
+                "wb",
+            ),
+        )
+        dump(
+            self.imputer,
+            open(
+                f"sklearn/{self.cfg.MODEL.ARCH}_F{self.cfg.DATASETS.FEATURES_TYPE}_imputer.pkl",
+                "wb",
+            ),
+        )
+
+        return (
+            pd.concat([x_train_2D, full_data_train["batch"]], axis=1),
+            pd.concat([x_test_2D, full_data_test["batch"]], axis=1),
+            y_train,
+            y_test,
+            train_indices,
+        )
+
+    def create_images_from_batches(self, df):
+        return df.groupby("batch")[df.columns[0]].apply(list).to_frame().reset_index()
+
+    # TODO Rename this here and in `_process_for_convnet`
+    def _extracted_from__process_for_convnet_54(self, arg0, arg1):
+        result = arg1.drop(
+            ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
+        ).astype("float16")
+
+        result = result.rename(
+            columns={x: y for x, y in zip(result.columns, range(len(result.columns)))}
+        )
+
+        return result
+
+    def _process_for_skeletons(self):
+
+        features = pd.read_csv(
+            self.cfg.DATASETS.FEATURES2_FULL, dtype="float32", header=None
+        )
+        features = features.drop(features.columns[0], axis=1)
+        df = pd.concat(
+            [
+                features,
+                self.data[["class", "batch", "camera_id", "subject_id", "R_id"]],
+            ],
+            axis=1,
+        )
+
+        print("loaded csvs")
 
         df = pd.concat(
             [
@@ -530,25 +640,42 @@ class Dataset:
         del df
         train_indices = np.unique(full_data_train["batch"])
         x_train = self._extracted_from__process_for_convnet_54("1", full_data_train)
-        print(x_train.shape)
         x_train = self.scale_n_impute(full_data_train).drop(["batch"], axis=1)
-
+        img_size = 24
+        pad_size = (img_size ** 2 - 450) / 2
+        print(pad_size)
+        pad_size = 63
         x_train_2D = x_train.apply(
-            lambda row: row.to_numpy().reshape(-1, 30),
-            axis=1
+            lambda row: np.pad(row.to_numpy(), (pad_size, pad_size)).reshape(
+                img_size, img_size
+            ),
+            axis=1,
         )
 
         x_test = self._extracted_from__process_for_convnet_54("3", full_data_test)
         x_test = self.scale_n_impute(full_data_test).drop(["batch"], axis=1)
 
         x_test_2D = x_test.apply(
-            lambda row: row.to_numpy().reshape(-1, 30),
-            axis=1
+            lambda row: np.pad(row.to_numpy(), (pad_size, pad_size)).reshape(
+                img_size, img_size
+            ),
+            axis=1,
         )
 
-
-        y_train = full_data_train[["class"]]
-        y_test = full_data_test[["class"]]
+        y_train = (
+            full_data_train[["class", "batch"]]
+            .groupby("batch")["class"]
+            .max()
+            .to_frame()
+            .reset_index()
+        )
+        y_test = (
+            full_data_test[["class", "batch"]]
+            .groupby("batch")["class"]
+            .max()
+            .to_frame()
+            .reset_index()
+        )
         print("processed data")
 
         dump(
@@ -574,22 +701,31 @@ class Dataset:
             train_indices,
         )
 
-    def create_2D_array(self, row):
-        return row[row.columns].to_numpy().reshape(15, 30)
-
-    # TODO Rename this here and in `_process_for_convnet`
-    def _extracted_from__process_for_convnet_54(self, arg0, arg1):
-        print(arg0)
-        result = arg1.drop(
+    def create_imgs_with_skeletons(row):
+        x = row.drop(
             ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
         ).astype("float16")
 
-        # x_train = x_train.reset_index(drop=True)
-        result = result.rename(
-            columns={x: y for x, y in zip(result.columns, range(len(result.columns)))}
-        )
+        avg = x.drop(x.columns[2::3], axis=1)
+        # spliting data
+        img_size = 128
+        x_per1 = avg.drop(avg.columns[50:], axis=1) * img_size
+        x_per2 = avg.drop(avg.columns[:50], axis=1) * img_size
+        img = np.zeros([img_size, img_size, 1], dtype=np.uint8)
 
-        return result
+        x_coords_per1 = []
+        for x in x_per1.to_numpy():
+            it = iter(x)
+            joint_coords = list(zip(it, it))
+            x_coords_per1.append(joint_coords)
+            x_coords_per1 = np.array(x_coords_per1)
+
+        x_coords_per2 = []
+        for x in x_per2.to_numpy():
+            it = iter(x)
+            joint_coords = list(zip(it, it))
+            x_coords_per2.append(joint_coords)
+            x_coords_per2 = np.array(x_coords_per2)
 
     def create_test_train_sets(self):
 
@@ -731,12 +867,12 @@ class Dataset:
                 y_test,
                 train_batches,
             ) = self._process_for_convnet()
-            print(x_train.shape)
-            print(x_train)
-            print(x_test.shape)
-            print(x_test)
-            print(y_train)
-            print(y_test)
+            train_images = self.create_images_from_batches(x_train)
+            test_images = self.create_images_from_batches(x_test)
 
-
-
+            return (
+                train_images,
+                test_images,
+                y_train,
+                y_test,
+            )

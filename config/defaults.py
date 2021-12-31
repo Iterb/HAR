@@ -6,23 +6,23 @@ from yacs.config import CfgNode as CN
 _C = CN()
 
 _C.MODEL = CN()
-_C.MODEL.DROPOUT_RATE = 0.3
-_C.MODEL.ARCH = "convnet"  # single/double/triple/convnet
-_C.MODEL.LSTM_LAYERS = 3  # 1/2/3
-
+_C.MODEL.DROPOUT_RATE = 0.5
+_C.MODEL.ARCH = "3DCNN"  # single/double/triple/convnet/3DCNN
+_C.MODEL.LSTM_LAYERS = 2  # 1/2/3
+_C.MODEL.LSTM_SIZE = 1024
 # _C.MODEL.CLASSES = ({'punch':0, 'kicking':1, 'pushing': 2, 'pat on back' : 3, 'point finger' : 4, 'hugging' : 5, 'giving an object' : 6, 'touch pocket' : 7, 'shaking hands' : 8, 'walking towards' : 9, 'walking apart' :10})
 # -----------------------------------------------------------------------------
 # Config definition
 # -----------------------------------------------------------------------------
 _C.SEQUENCE = CN()
-_C.SEQUENCE.WINDOW_SIZE = 25
-_C.SEQUENCE.LIN_SIZE = 25
+_C.SEQUENCE.WINDOW_SIZE = 28
+_C.SEQUENCE.LIN_SIZE = 28
 _C.SEQUENCE.LABEL_OFFSET = 0
 # -----------------------------------------------------------------------------
 # Dataset
 # -----------------------------------------------------------------------------
 _C.DATASETS = CN()
-_C.DATASETS.FEATURES_TYPE = 2
+_C.DATASETS.FEATURES_TYPE = 1
 # CSV of all key points in all videos from NTU dataset
 _C.DATASETS.FULL = "/media/sebastian/STORAGE_HDD/data/rose_data_pc_2.csv"  #
 _C.DATASETS.FEATURES_FULL = "/media/sebastian/STORAGE_HDD/data/normalized_25P_short.csv"
@@ -43,6 +43,7 @@ _C.DATASETS.FEATURES3_PER2_D = "/media/sebastian/STORAGE_HDD/data/polarcoords2_p
 _C.DATASETS.FEATURES_PER1 = "/media/sebastian/STORAGE_HDD/data/normalized_25P_short.csv"
 _C.DATASETS.FEATURES_PER2 = "/media/sebastian/STORAGE_HDD/data/normalized_25P_short.csv"
 _C.DATASETS.FEATURES_DIST = "/media/sebastian/STORAGE_HDD/data/normalized_25P_short.csv"
+_C.DATASETS.SKELETON_IMGS = "generated_dataset/"
 # List of the dataset names for testing
 _C.DATASETS.TEST = "data/datasets/test.csv"
 _C.DATASETS.SPLIT_TYPE = "cv"  # cv or cs
@@ -92,8 +93,8 @@ _C.INFER.OUTPUT_PATH = "/workspace/output.avi"
 # ---------------------------------------------------------------------------- #
 _C.SOLVER = CN()
 _C.SOLVER.OPTIMIZER_NAME = "Adam"
-_C.SOLVER.MAX_EPOCHS = 55
-_C.SOLVER.BASE_LR = 0.001
+_C.SOLVER.MAX_EPOCHS = 1
+_C.SOLVER.BASE_LR = 0.0005
 _C.SOLVER.BATCH_SIZE = 256
 
 _C.TEST = CN()
