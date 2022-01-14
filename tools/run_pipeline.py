@@ -32,9 +32,7 @@ def arg_parser():
         nargs=argparse.REMAINDER,
     )
 
-    args = parser.parse_args()
-
-    return args
+    return parser.parse_args()
 
 
 def main():
@@ -61,9 +59,7 @@ def main():
     #         logger.info(config_str)
 
     pose_features = extract_pose_features_from_video(cfg, save_output=True)
-    preds = []
-    for keypoints in pose_features:
-        preds.append(do_inference(cfg, keypoints))
+    preds = [do_inference(cfg, keypoints) for keypoints in pose_features]
     stacked_preds = calculate_stacked_preditions(
         cfg.INFER.WINDOW_DURATION_S, cfg.INFER.WINDOW_OFFSET_S, preds
     )

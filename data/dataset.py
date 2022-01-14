@@ -96,10 +96,9 @@ class Dataset:
         ).astype("float16")
         # x_train = x_train.reset_index(drop=True)
         x_train = x_train.rename(
-            columns={
-                x: y for x, y in zip(x_train.columns, range(0, len(x_train.columns)))
-            }
+            columns=dict(zip(x_train.columns, range(len(x_train.columns))))
         )
+
         print(x_train.shape)
         x_train = pd.DataFrame(
             self.imputer.fit_transform(x_train),
@@ -119,10 +118,9 @@ class Dataset:
         ).astype("float16")
         # x_test = x_test.reset_index(drop=True)
         x_test = x_test.rename(
-            columns={
-                x: y for x, y in zip(x_test.columns, range(0, len(x_test.columns)))
-            }
+            columns=dict(zip(x_test.columns, range(len(x_test.columns))))
         )
+
         x_test = pd.DataFrame(
             self.imputer.transform(x_test), columns=x_test.columns, index=x_test.index
         )  # prob only transform
@@ -586,14 +584,15 @@ class Dataset:
 
         # x_train = x_train.reset_index(drop=True)
         result = result.rename(
-            columns={x: y for x, y in zip(result.columns, range(len(result.columns)))}
+            columns=dict(zip(result.columns, range(len(result.columns))))
         )
+
 
         return result
 
     def create_test_train_sets(self):
 
-        all_batches = [n for n in range(self.data["batch"].max())]
+        all_batches = list(range(self.data["batch"].max()))
 
         if self.cfg.MODEL.ARCH == "single":
             (

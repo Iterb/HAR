@@ -27,7 +27,7 @@ def create_sequences(x, y, cfg):
             current_batch = i[-2]
             prev_poses_data = deque(maxlen=cfg.SEQUENCE.WINDOW_SIZE)
 
-            prev_poses_data.append([n for n in i[:-2]])
+            prev_poses_data.append(list(i[:-2]))
 
     #   for seq, label in sequential_data:
     #     X.append(seq)
@@ -60,7 +60,7 @@ def create_sequences2(x, y, cfg):
             current_batch = i[-2]
             prev_poses_data = deque(maxlen=cfg.SEQUENCE.WINDOW_SIZE)
 
-            prev_poses_data.append([n for n in i[:-2]])
+            prev_poses_data.append(list(i[:-2]))
 
     return batch
 

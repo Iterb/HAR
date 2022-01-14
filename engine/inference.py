@@ -168,8 +168,7 @@ def create_sequence_for_infer(window_size, df, seq_type):
                 sequential_data.append(prev_poses_data)
         return np.array(sequential_data)
     elif seq_type == "linspace":
-        sequential_data = []
         idx = np.round(np.linspace(0, len(df) - 1, window_size)).astype(int)
         df = df.iloc[idx, :].reset_index(drop=True)
-        sequential_data.append(np.array(df))
+        sequential_data = [np.array(df)]
         return np.array(sequential_data)
