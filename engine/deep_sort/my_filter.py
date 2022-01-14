@@ -34,9 +34,9 @@ class MyKalmanFilter(object):
         transition_covariance=None,
         observation_covariance=None,
     ):
-        ndim, dt = 4, 1.0
         if motion_mat is None:
             self.motion_mat = np.eye(2 * ndim, 2 * ndim)
+            ndim, dt = 4, 1.0
             for i in range(ndim):
                 self.motion_mat[i, ndim + i] = dt
         else:
@@ -114,5 +114,4 @@ class MyKalmanFilter(object):
         z = scipy.linalg.solve_triangular(
             cholesky_factor, d.T, lower=True, check_finite=False, overwrite_b=True
         )
-        squared_maha = np.sum(z * z, axis=0)
-        return squared_maha
+        return np.sum(z * z, axis=0)

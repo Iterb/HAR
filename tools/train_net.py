@@ -43,9 +43,6 @@ def train(cfg):
             y_train_seq.shape[1],
             cfg,
         )
-    elif cfg.MODEL.ARCH == "triple":
-        pass
-
     model = do_train(
         cfg,
         model,

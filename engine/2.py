@@ -26,9 +26,11 @@ import Constants
 class Input():
     def __init__(self, debug = False):
         #from openpose import *
-        params = dict()
-        params["model_folder"] = Constants.openpose_modelfolder
-        params["net_resolution"] = "-1x320"
+        params = {
+            'model_folder': Constants.openpose_modelfolder,
+            'net_resolution': '-1x320',
+        }
+
         self.openpose = op.WrapperPython()
         self.openpose.configure(params)
         self.openpose.start()
@@ -54,10 +56,9 @@ class Input():
 
 
     def getCurrentFrameAsImage(self):
-            frame = self.currentFrame
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            pgImg = pygame.image.frombuffer(frame.tostring(), frame.shape[1::-1], "RGB")
-            return pgImg
+        frame = self.currentFrame
+        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        return pygame.image.frombuffer(frame.tostring(), frame.shape[1::-1], "RGB")
 
 
     def run(self):
@@ -89,10 +90,7 @@ class Input():
 
         for track in self.tracker.tracks:
             color = None
-            if not track.is_confirmed():
-                color = (0,0,255)
-            else:
-                color = (255,255,255)
+            color = (0, 0, 255) if not track.is_confirmed() else (255, 255, 255)
             bbox = track.to_tlbr()
             print("Body keypoints:")
             print(track.last_seen_detection.pose)

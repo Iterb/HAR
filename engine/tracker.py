@@ -53,5 +53,4 @@ class Tracker:
         return self.tracker.tracks, currentFrame
 
     def denormalize_poses(self, poses):
-        unposes = poses * np.array([self.width, self.height])
-        return unposes
+        return poses * np.array([self.width, self.height])
