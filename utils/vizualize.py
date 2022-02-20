@@ -1,5 +1,5 @@
-from matplotlib import pyplot as plt
 import numpy as np
+from matplotlib import pyplot as plt
 
 
 def plot_probablites(data):
@@ -14,7 +14,7 @@ def plot_probablites(data):
     ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
 
     # Put a legend to the right of the current axis
-    plt.legend( 
+    plt.legend(
         [
             "punch",
             "kicking",
@@ -28,7 +28,8 @@ def plot_probablites(data):
             "walking towards",
             "walking apart",
         ],
-        bbox_to_anchor=(1.05, 0.6))
-    plt.ylabel('Uśrednione prawdopodobieństwo')
-    plt.xlabel('Czas [s]')
+        bbox_to_anchor=(1.05, 0.6),
+    )
+    plt.ylabel("Uśrednione prawdopodobieństwo")
+    plt.xlabel("Czas [s]")
     plt.savefig("test.png")

@@ -1,36 +1,16 @@
-import os
 from pickle import dump
-from random import shuffle
 
-import cv2
-import pandas as pd
-from sklearn import preprocessing
-from sklearn.impute import SimpleImputer
-import wandb
-import tensorflow as tf
-from tensorflow import keras
 import numpy as np
+import pandas as pd
+from sklearn.impute import SimpleImputer
 
-from utils.make_sequences import (
-    create_sequences,
-    create_sequences2,
-    create_spaced_sequences,
-    create_spaced_sequences2,
-)
+import wandb
+from sklearn import preprocessing
+from utils.make_sequences import create_spaced_sequences, create_spaced_sequences2
 
 
 class Dataset:
-    """Dataset
-    ## TODO add logger!
-    Args:
-        images_dir (str): path to images folder
-        masks_dir (str): path to segmentation masks folder
-        class_values (list): values of classes to extract from segmentation mask
-        augmentation (albumentations.Compose): data transfromation pipeline
-            (e.g. flip, scale, etc.)
-        preprocessing (albumentations.Compose): data preprocessing
-            (e.g. noralization, shape manipulation, etc.)
-    """
+    """Dataset"""
 
     def __init__(
         self,
@@ -373,8 +353,6 @@ class Dataset:
             full_data_test_dist, self.scaler_dist, self.imputer_dist, False
         )
 
-        print(x_train_dist)
-        print(x_test_dist)
         y_train = full_data_train_per1[["class"]]
         y_test = full_data_test_per1[["class"]]
 
@@ -532,7 +510,7 @@ class Dataset:
         ).astype("float16")
 
         result = result.rename(
-            columns={x: y for x, y in zip(result.columns, range(len(result.columns)))}
+            columns=dict(zip(result.columns, range(len(result.columns))))
         )
 
         return result
@@ -669,9 +647,9 @@ class Dataset:
             x_coords_per2.append(joint_coords)
             x_coords_per2 = np.array(x_coords_per2)
 
-    def create_test_train_sets(self):
+    def process_data(self):
 
-        all_batches = [n for n in range(self.data["batch"].max())]
+        all_batches = list(range(self.data["batch"].max()))
 
         if self.cfg.MODEL.ARCH == "single":
             (
@@ -804,58 +782,3 @@ class Dataset:
                 y_train_seq,
                 y_test_seq,
             )
-
-        elif self.cfg.MODEL.ARCH == "convnet":
-            (
-                x_train,
-                x_test,
-                y_train,
-                y_test,
-                train_batches,
-            ) = self._process_for_convnet()
-            train_images = self.create_images_from_batches(x_train)
-            test_images = self.create_images_from_batches(x_test)
-
-            return (
-                train_images,
-                test_images,
-                y_train,
-                y_test,
-            )
-
-    # def _process_for_single_LSTM(self):
-    #     # Załadowanie odpowiednich cech z pliku csv
-    #     if wandb.config.features_type == LIMB_ANGLE:
-    #         features = pd.read_csv(self.cfg.DATASETS.FEATURES_FULL, dtype="float32")
-    #     [...]
-
-    #     # Uzupełnianie brakujących złączy na podstawi
-    #     features = fill_missing_features(self.averge_features)
-
-    #     # Podzielenie na zbiór testujący i traingowy według zaleceń autorów zbioru NTU
-    #     splitter = (
-    #         self.cfg.DATASETS.TRAIN_SUBJECTS
-    #         if self.cfg.DATASETS.SPLIT_TYPE == CROSS_SUBJECT
-    #         else self.cfg.DATASETS.TRAIN_CAMERAS
-    #     )
-
-    #     full_train_set = features.loc[features["subject_id"].isin(splitter)]
-    #     test_set = features.loc[~features["subject_id"].isin(splitter)]
-
-    #     # Wyznaczenie zbioru walidacyjego jako 20% uczącego
-    #     train_set, val_set = train_test_split(
-    #         full_train_set, test_size=0.2, shuffle=False
-    #     )
-
-    #     train_indices = np.unique(train_set["batch"])
-
-    #     # Wydzielenie cech uczących oraz etykiet z oryginalnych DataFrame
-    #     x_train = train_set.drop(["class", "camera_id", "subject_id", "R_id"], axis=1)
-    #     x_test = test_set.drop(["class", "camera_id", "subject_id", "R_id"], axis=1)
-    #     x_val = val_set.drop(["class", "camera_id", "subject_id", "R_id"], axis=1)
-    #     y_train = train_set[["class"]]
-    #     y_test = test_set[["class"]]
-    #     y_val = val_set[["class"]]
-    #     [...]
-
-    #     return x_train, x_test, x_val, y_train, y_test, y_val, train_indices

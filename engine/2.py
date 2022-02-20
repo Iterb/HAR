@@ -1,28 +1,25 @@
 # -*- coding: utf-8 -*-
-import cv2
 import sys
 import time
-import numpy as np
 
+import cv2
+import numpy as np
 import pygame
 
 # Load OpenPose:
 sys.path.append("/usr/local/python")
-from openpose import pyopenpose as op
-
-
+import Constants
+from deep_sort import nn_matching, preprocessing
+from deep_sort.detection import Detection
+from deep_sort.detection import Detection as ddet
 from deep_sort.iou_matching import iou_cost
 from deep_sort.kalman_filter import KalmanFilter
-from deep_sort.detection import Detection
-from deep_sort.tracker import Tracker as DeepTracker
-from deep_sort import nn_matching
-from deep_sort import preprocessing
 from deep_sort.linear_assignment import min_cost_matching
-from deep_sort.detection import Detection as ddet
+from deep_sort.tracker import Tracker as DeepTracker
+from openpose import pyopenpose as op
+
 from tools import generate_detections as gdet
 from utils import poses2boxes
-
-import Constants
 
 
 class Input:

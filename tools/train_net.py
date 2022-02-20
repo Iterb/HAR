@@ -1,94 +1,43 @@
 # encoding: utf-8
 
 import argparse
+import logging
 import os
 import sys
 from os import mkdir
 
-import wandb
-from keras.utils.vis_utils import plot_model
-
 sys.path.append(".")
 from config import cfg
 from data.dataset import Dataset
-from engine.trainer import do_train
-from engine.test import do_test
-from engine.summarize import summarize
-from modeling import SingleLSTM, DoubleLSTM,TripleLSTM, ConvNet, CNN3D
+from engine import Summarizer, Tester, Trainer
+from modeling import DoubleLSTM, SingleLSTM, TripleLSTM
 from utils.logger import setup_logger
 from utils.wandblog import setup_wandb_logger
 
 
-def train(cfg):
+def do_train(cfg):
 
     run = setup_wandb_logger(cfg)
     dataset = Dataset(cfg)
-    data = dataset.create_test_train_sets()
-    if cfg.MODEL.ARCH == "single":
-        X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
-        model = SingleLSTM().build_model(
-            X_train_seq.shape[1], X_train_seq.shape[2], y_train_seq.shape[1], cfg
-        )
-    elif cfg.MODEL.ARCH == "double":
-        (
-            X_train_seq_per1,
-            X_train_seq_per2,
-            y_train_seq,
-            X_test_seq_per1,
-            X_test_seq_per2,
-            y_test_seq,
-        ) = data
-        model = DoubleLSTM.build_model(
-            X_train_seq_per1.shape[1],
-            X_train_seq_per2.shape[2],
-            y_train_seq.shape[1],
-            cfg,
-        )
-    elif cfg.MODEL.ARCH == "triple":
-        (
-            X_train_seq_per1,
-            X_train_seq_per2,
-            X_train_dist_seq,
-            X_test_seq_per1,
-            X_test_seq_per2,
-            X_test_dist_seq,
-            y_train_seq,
-            y_test_seq,
-        ) = data
-        model = TripleLSTM.build_model(
-            X_train_seq_per1.shape[1],
-            X_train_seq_per2.shape[2],
-            y_train_seq.shape[1],
-            X_train_dist_seq.shape[2],
-            cfg,
-        )
-    elif cfg.MODEL.ARCH == "convnet":
-        model = ConvNet.build_model(
-            (24, 24, wandb.config.number_of_frames, 1),
-            11,
-            cfg,
-        )
-    elif cfg.MODEL.ARCH == "CNN3D":
-        model = CNN3D.build_model(
-            (24, 24, wandb.config.number_of_frames, 1),
-            11,
-            cfg,
-        )
-   
-    model = do_train(
-        cfg,
-        model,
-        data,
-    )
-    print(model.summary())
-    plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
 
-    score = do_test(cfg, model, data)
-    summarize(
-        cfg,
-        model,
-        data,
-    )
+    if cfg.MODEL.ARCH == "single":
+        model = SingleLSTM(cfg).compile_model()
+    elif cfg.MODEL.ARCH == "double":
+        model = DoubleLSTM(cfg).compile_model()
+    elif cfg.MODEL.ARCH == "triple":
+        model = TripleLSTM(cfg).compile_model()
+
+    trainer = Trainer(model, dataset, cfg)
+    trained_model = trainer.fit()
+    accuracy = Tester.evaluate(trained_model, dataset, cfg)
+    summarizer = Summarizer(trained_model, dataset, cfg)
+    classification_report = summarizer.classification_report()
+    logger = logging.getLogger("model.train")
+    logger.info("{}".format(classification_report))
+    cm = summarizer.create_cm()
+    logger.info("{}".format(cm))
+
+    onnx_model = trainer.onnx_export()
 
 
 def main():
@@ -128,7 +77,7 @@ def main():
             logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
-    train(cfg)
+    do_train(cfg)
 
 
 if __name__ == "__main__":

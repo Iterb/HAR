@@ -1,18 +1,14 @@
-import logging
-import numpy as np
 import datetime
-import json
-import wandb
+import logging
+
+from tensorflow.keras.callbacks import EarlyStopping, ModelCheckpoint, TensorBoard
 from wandb.keras import WandbCallback
-import tensorflow as tf
-from tensorflow.keras.callbacks import ModelCheckpoint, TensorBoard, EarlyStopping
-from tensorflow import keras
 
 
 def do_sweep(
     cfg,
     model,
-    data,
+    dataset,
 ):
 
     epochs = cfg.SOLVER.MAX_EPOCHS
@@ -46,7 +42,7 @@ def do_sweep(
     )
 
     if cfg.MODEL.ARCH == "single":
-        X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
+        X_train_seq, y_train_seq, X_test_seq, y_test_seq = dataset.process_data()
         history = model.fit(
             X_train_seq,
             y_train_seq,
@@ -63,7 +59,7 @@ def do_sweep(
             X_test_seq_per1,
             X_test_seq_per2,
             y_test_seq,
-        ) = data
+        ) = dataset.process_data()
         history = model.fit(
             [X_train_seq_per1, X_train_seq_per2],
             y_train_seq,
@@ -82,7 +78,7 @@ def do_sweep(
             X_test_dist_seq,
             y_train_seq,
             y_test_seq,
-        ) = data
+        ) = dataset.process_data()
         history = model.fit(
             [X_train_seq_per1, X_train_seq_per2, X_train_dist_seq],
             y_train_seq,

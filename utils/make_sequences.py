@@ -20,18 +20,15 @@ def create_sequences(x, y, cfg):
         prev_poses_data.append([n for n in i[:-2]])
         if current_batch == (i[-2]):
             if len(prev_poses_data) == cfg.SEQUENCE.WINDOW_SIZE:
-                # sequential_data.append([np.array(prev_poses_data), i[-1]])
+
                 X.append(np.array(prev_poses_data))
                 y.append(i[-1])
         else:
             current_batch = i[-2]
             prev_poses_data = deque(maxlen=cfg.SEQUENCE.WINDOW_SIZE)
 
-            prev_poses_data.append([n for n in i[:-2]])
+            prev_poses_data.append(list(i[:-2]))
 
-    #   for seq, label in sequential_data:
-    #     X.append(seq)
-    #     y.append(label-LABEL_OFFSET)
     X = np.array(X)
     y = np.array(y).reshape(X.shape[0], 1)
     return np.array(X), to_categorical(np.array(y))
@@ -85,26 +82,26 @@ def create_spaced_sequences(x, y, size, batch_numbers, cfg):
 
 def create_spaced_sequences2(x, y, dist, size, batch_numbers, cfg):
 
-  df = pd.concat([x, y], axis=1)
-  X = []
-  y = []
-  D = []
-  for batch_nr in batch_numbers:
-    temp_df = df.loc[df["batch"] == batch_nr]
-    temp_dist = dist.loc[dist["batch"] == batch_nr]
-    if (len(temp_df)) == 0 or (len(temp_dist)) == 0:
-      continue
-      
-    try:
-        idx = np.round(np.linspace(0, len(temp_df) - 1, size)).astype(int)
+    df = pd.concat([x, y], axis=1)
+    X = []
+    y = []
+    D = []
+    for batch_nr in batch_numbers:
+        temp_df = df.loc[df["batch"] == batch_nr]
+        temp_dist = dist.loc[dist["batch"] == batch_nr]
+        if (len(temp_df)) == 0 or (len(temp_dist)) == 0:
+            continue
 
-        window = temp_df.iloc[idx, :-2]
-        label = temp_df.iloc[0, -1]
-        distance = temp_dist.iloc[idx, :-1]
-        X.append(np.array(window))
-        y.append(label - cfg.SEQUENCE.LABEL_OFFSET)
-        D.append(np.array(distance))
-    except:
-        continue
+        try:
+            idx = np.round(np.linspace(0, len(temp_df) - 1, size)).astype(int)
 
-  return np.array(X), to_categorical(np.array(y)), np.array(D) 
+            window = temp_df.iloc[idx, :-2]
+            label = temp_df.iloc[0, -1]
+            distance = temp_dist.iloc[idx, :-1]
+            X.append(np.array(window))
+            y.append(label - cfg.SEQUENCE.LABEL_OFFSET)
+            D.append(np.array(distance))
+        except:
+            continue
+
+    return np.array(X), to_categorical(np.array(y)), np.array(D)

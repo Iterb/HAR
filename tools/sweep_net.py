@@ -1,77 +1,38 @@
 # encoding: utf-8
-import json
 import argparse
+import json
 import os
 import sys
 from os import mkdir
+
 import wandb
 
 sys.path.append(".")
 from config import cfg
 from data.dataset import Dataset
 from engine.sweeper import do_sweep
-from engine.test import do_test
-from engine.summarize import summarize
-from modeling import SingleLSTM, DoubleLSTM, TripleLSTM
-
+from modeling import DoubleLSTM, SingleLSTM, TripleLSTM
 from utils.logger import setup_logger
 from utils.wandblog import setup_wandb_logger
 
 
-def train():
+def do_sweep():
 
     run = setup_wandb_logger(cfg)
     run.name = f"NL_{wandb.config.num_of_lstm_layers}_BS_{wandb.config.batch_size}_FR_{wandb.config.number_of_frames}_LR_{wandb.config.learning_rate}_DO_{wandb.config.dropout}_LS_{wandb.config.LSTM_size}"
     dataset = Dataset(cfg)
-    data = dataset.create_test_train_sets()
+
     if cfg.MODEL.ARCH == "single":
-        X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
-        model = SingleLSTM().build_model(
-            X_train_seq.shape[1], X_train_seq.shape[2], y_train_seq.shape[1], cfg
-        )
+        model = SingleLSTM(cfg).compile_model()
     elif cfg.MODEL.ARCH == "double":
-        (
-            X_train_seq_per1,
-            X_train_seq_per2,
-            y_train_seq,
-            X_test_seq_per1,
-            X_test_seq_per2,
-            y_test_seq,
-        ) = data
-        model = DoubleLSTM.build_model(
-            X_train_seq_per1.shape[1],
-            X_train_seq_per2.shape[2],
-            y_train_seq.shape[1],
-            cfg,
-        )
+        model = DoubleLSTM(cfg).compile_model()
     elif cfg.MODEL.ARCH == "triple":
-        (
-            X_train_seq_per1,
-            X_train_seq_per2,
-            X_train_dist_seq,
-            X_test_seq_per1,
-            X_test_seq_per2,
-            X_test_dist_seq,
-            y_train_seq,
-            y_test_seq,
-        ) = data
-        model = TripleLSTM.build_model(
-            X_train_seq_per1.shape[1],
-            X_train_seq_per2.shape[2],
-            y_train_seq.shape[1],
-            X_train_dist_seq.shape[2],
-            cfg,
-        )
+        model = TripleLSTM(cfg).compile_model()
+
     do_sweep(
         cfg,
         model,
-        data,
-    )
-    score = do_test(cfg, model, data)
-    summarize(
-        cfg,
-        model,
-        data,
+        dataset,
     )
 
 
@@ -117,7 +78,7 @@ def main():
 
     try:
         sweep_id = wandb.sweep(sweep_config, project="human_activity_recognition")
-        wandb.agent(sweep_id, function=train)
+        wandb.agent(sweep_id, function=do_sweep)
     except:
         pass
 

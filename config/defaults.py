@@ -7,22 +7,11 @@ _C = CN()
 
 _C.MODEL = CN()
 _C.MODEL.DROPOUT_RATE = 0.5
-_C.MODEL.ARCH = "single"  # single/double/triple/convnet/CNN3D
+_C.MODEL.ARCH = "single"  # single/double/triple
 _C.MODEL.LSTM_LAYERS = 2  # 1/2/3
 _C.MODEL.LSTM_SIZE = 512
-_C.MODEL.CLASSES = {
-    "punch": 0,
-    "kicking": 1,
-    "pushing": 2,
-    "pat on back": 3,
-    "point finger": 4,
-    "hugging": 5,
-    "giving an object": 6,
-    "touch pocket": 7,
-    "shaking hands": 8,
-    "walking towards": 9,
-    "walking apart": 10,
-}
+
+
 # -----------------------------------------------------------------------------
 # Config definition
 # -----------------------------------------------------------------------------
@@ -101,7 +90,7 @@ _C.INFER.VIDEO_PATH = (
     "/media/sebastian/STORAGE_HDD/data/human_interaction/cropped_many_actions.avi"
     # "/media/sebastian/STORAGE_HDD/data/test6.avi"
 )
-_C.INFER.MODEL_PATH = "/workspace/infer_models/single_F3_full_28_60.onnx"
+_C.INFER.PATH_TO_ONNX = "/workspace/infer_models/single_F3_full_28_60.onnx"
 _C.INFER.DO_TRACK = True
 _C.INFER.DO_SHOW = True
 _C.INFER.WINDOW_DURATION_S = 2
@@ -129,7 +118,7 @@ _C.OPENPOSE.MODELS_PATH = "/home/marcelo/openpose/models/"
 # ---------------------------------------------------------------------------- #
 _C.SOLVER = CN()
 _C.SOLVER.OPTIMIZER_NAME = "Adam"
-_C.SOLVER.MAX_EPOCHS = 1
+_C.SOLVER.MAX_EPOCHS = 55
 _C.SOLVER.BASE_LR = 0.0005
 _C.SOLVER.BATCH_SIZE = 256
 

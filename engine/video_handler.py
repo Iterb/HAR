@@ -1,19 +1,18 @@
-from pickle import FALSE
-from typing import Any, List, Type
-import sys
-import os
-from sys import platform
-import argparse
 import itertools
+import os
+import sys
+import timeit
+from sys import platform
+from typing import Any, List, Type
 
-import numpy as np
 import cv2
+import numpy as np
 import pandas as pd
 import yacs
 
 from engine.tracker import Tracker
-from utils.utils import poses2boxes
-import timeit
+from utils.display import put_interactions_on_video
+
 FEATURES_TYPE_1 = 1
 FEATURES_TYPE_2 = 2
 FEATURES_TYPE_3 = 3
@@ -60,38 +59,51 @@ class pose_tracklet:
         self.keypoints = []
 
 
-def extract_pose_features_from_video(
-    cfg: yacs.config.CfgNode, save_output=False, full_video=False
-) -> List[Type[pd.DataFrame]]:
-    frames_intervals = sample_video(
-        cfg.INFER.VIDEO_PATH, cfg.INFER.WINDOW_DURATION_S, cfg.INFER.WINDOW_OFFSET_S
-    )
-    all_possible_features = []
-    if full_video:
-        frames_intervals = [[0, np.amax(frames_intervals)]]
-    for frame_interval in frames_intervals:
-        pose_frame_data = process_video(
-            cfg=cfg,
-            start_frame=np.min(frame_interval),
-            end_frame=np.max(frame_interval),
-            save_output=save_output,
+class VideoHander:
+    @staticmethod
+    def load_video(
+        cfg: yacs.config.CfgNode, save_output=False, full_video=False
+    ) -> List[Type[pd.DataFrame]]:
+        frames_intervals = sample_video(
+            cfg.INFER.VIDEO_PATH, cfg.INFER.WINDOW_DURATION_S, cfg.INFER.WINDOW_OFFSET_S
         )
-        pose_frame_data = np.array(pose_frame_data)
-        df_poses_list = create_df_for_each_person(pose_frame_data)
-        all_possible_interactions = itertools.combinations(df_poses_list, 2)
-        for person_pose in all_possible_interactions:
-            all_possible_features.append(
+        all_possible_features = []
+        if full_video:
+            frames_intervals = [[0, np.amax(frames_intervals)]]
+        for frame_interval in frames_intervals:
+            pose_frame_data = estimate_pose(
+                cfg=cfg,
+                start_frame=np.min(frame_interval),
+                end_frame=np.max(frame_interval),
+                save_output=save_output,
+            )
+            pose_frame_data = np.array(pose_frame_data)
+            df_poses_list = create_df_for_each_person(pose_frame_data)
+            all_possible_interactions = itertools.combinations(df_poses_list, 2)
+            all_possible_features.extend(
                 create_features(
                     feature_type=cfg.INFER.FEATURES_TYPE,
                     architecture_type=cfg.INFER.ARCH,
                     person_1_pose=person_pose[0],
                     person_2_pose=person_pose[1],
                 )
+                for person_pose in all_possible_interactions
             )
-    return all_possible_features
+        return all_possible_features
+    
+    @staticmethod
+    def save_video(cfg, prediction):
+        pose_features = VideoHander.load_video(cfg, save_output=True, full_video=True)
+        put_interactions_on_video(
+            cfg.INFER.OUTPUT_PATH,
+            prediction,
+            cfg.INFER.WINDOW_DURATION_S,
+            cfg.INFER.WINDOW_OFFSET_S,
+            cfg.INFER.OUTPUT_PATH,
+        )
 
 
-def process_video(
+def estimate_pose(
     cfg, start_frame: int, end_frame: int, save_output: bool = False
 ) -> np.array:
     """
@@ -112,7 +124,7 @@ def process_video(
         # Windows Import
         if platform == "win32":
             # Change these variables to point to the correct folder (Release/x64 etc.)
-            sys.path.append(dir_path + "/../../python/openpose/Release")
+            sys.path.append(f"{dir_path}/../../python/openpose/Release")
             os.environ["PATH"] = (
                 os.environ["PATH"]
                 + ";"
@@ -132,7 +144,7 @@ def process_video(
         print(
             "Error: OpenPose library could not be found. Did you enable `BUILD_PYTHON` in CMake and have this Python script in the right folder?"
         )
-        raise e
+        raise e from e
 
     # Custom Params (refer to include/openpose/flags.hpp for more parameters)
     params = {
@@ -181,14 +193,14 @@ def process_video(
         opWrapper.emplaceAndPop(op.VectorDatum([datum]))
         currentFrame = datum.cvOutputData
         if do_track:
-            tracks, currentFrame = tracker.run(datum)
+            tracks, currentFrame = tracker.track(datum)
         if do_show:
             if do_track:
                 for track in tracks:
                     color = None
                     color = (255, 255, 255)
                     bbox = track.to_tlbr()
-                    #print(bbox)
+                    # print(bbox)
                     cv2.rectangle(
                         currentFrame,
                         (int(bbox[0]), int(bbox[1])),
@@ -199,7 +211,10 @@ def process_video(
                     cv2.putText(
                         currentFrame,
                         "id%s" % (track.track_id),
-                        (int(bbox[0]) + int((int(bbox[2]) - int(bbox[0])) / 2)  - 5, int(bbox[1]) + 20),
+                        (
+                            int(bbox[0]) + int((int(bbox[2]) - int(bbox[0])) / 2) - 5,
+                            int(bbox[1]) + 20,
+                        ),
                         0,
                         5e-3 * 100,
                         (255, 255, 255),
@@ -213,12 +228,14 @@ def process_video(
             out.write(currentFrame.astype("uint8"))
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
-        #print()
+        # print()
     cap.release()
     if save_output:
         out.release()
-    time_delta =  timeit.default_timer() - starttime
-    print(f"The time difference is : {time_delta} for {end_frame- start_frame} frames which eq to {(end_frame- start_frame)/time_delta} FPS")
+    time_delta = timeit.default_timer() - starttime
+    print(
+        f"The time difference is : {time_delta} for {end_frame- start_frame} frames which eq to {(end_frame- start_frame)/time_delta} FPS"
+    )
 
     return pose_frame_data
 
@@ -281,7 +298,6 @@ def calculate_stacked_preditions(window_duration: int, window_offset: int, preds
 
     average_stacked_predictions = np.divide(stacked_predictions, divider.reshape(-1, 1))
 
-
     return average_stacked_predictions
 
 
@@ -313,7 +329,7 @@ def calculate_average_limb_lengths(x_coords):
 
 
 def calculate_average_angles(x_coords):
-    x_avg_angles = [[] for i in range(len(ANGLES))]
+    x_avg_angles = [[] for _ in range(len(ANGLES))]
     for frame in x_coords:
         for i, angle in enumerate(ANGLES):
             if (
@@ -332,14 +348,14 @@ def calculate_limb_lengths(x_coords, average_LIMBS, average_norm):
     for frame in x_coords:
         x_person = []
         if (np.any(frame[1] == 0)) or (np.any(frame[8] == 0)):
-            norm = 1 #average_norm
+            norm = 1  # average_norm
         else:
             norm = np.linalg.norm(frame[1] - frame[8])
 
         # x_person.append(1)
-        for i, limb in enumerate(LIMBS):
+        for limb in LIMBS:
             if (np.any(frame[limb[0]] == 0)) or (np.any(frame[limb[1]] == 0)):
-                l = 1 #average_LIMBS[i]
+                l = 1  # average_LIMBS[i]
             else:
                 try:
                     l = np.linalg.norm(frame[limb[0]] - frame[limb[1]]) / norm
@@ -361,13 +377,13 @@ def calculate_angles(x_coords, average_ang):
     x_angles = []
     for frame in x_coords:
         x_person = []
-        for i, angle in enumerate(ANGLES):
+        for angle in ANGLES:
             if (
                 np.any(frame[angle[0]] == 0)
                 or np.any(frame[angle[1]] == 0)
                 or np.any(frame[angle[2]] == 0)
             ):
-                a = 1# average_ang[i]
+                a = 1  # average_ang[i]
             else:
                 a = calculate_angle(frame[angle[0]], frame[angle[1]], frame[angle[2]])
             x_person.append(a)
@@ -412,7 +428,7 @@ def calculate_distance(x_coords_1, x_coords_2, average_norm, distance_type="2P")
                 x_person.append(d)
             x_distance.append(x_person)
         elif distance_type == "ffa":
-            x_person = [[0 for x in range(15)] for y in range(15)]
+            x_person = [[0 for _ in range(15)] for _ in range(15)]
             moving_avg_d = 1
             for i in range(15):
                 for j in range(15):
@@ -613,7 +629,6 @@ def normalize(x, feature_type=FEATURES_TYPE_1, architecture_type=SINGLE_LSTM):
         return (x_polar_coords1_df, x_polar_coords2_df)
 
 
-# TODO Rename this here and in `normalize`
 def _extracted_from_normalize_12(arg0):
     result = []
     for x in arg0.to_numpy():
@@ -626,7 +641,6 @@ def _extracted_from_normalize_12(arg0):
     return result
 
 
-# TODO Rename this here and in `normalize`
 def _extracted_from_normalize_112(x_polar_coords1_df, x_polar_coords2_df):
     x = pd.concat([x_polar_coords1_df, x_polar_coords2_df], axis=1)
     x.columns = range(x.shape[1])

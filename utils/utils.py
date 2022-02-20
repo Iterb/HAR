@@ -1,8 +1,7 @@
+import itertools
+
 import numpy as np
 from numba import jit
-import itertools
-import gc
-import tqdm
 
 
 def pairwise(iterable):

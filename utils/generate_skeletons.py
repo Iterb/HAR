@@ -1,7 +1,8 @@
-import pandas as pd
-import numpy as np
-import cv2
 from pathlib import Path
+
+import cv2
+import numpy as np
+import pandas as pd
 from tqdm import tqdm
 
 PATH = "/media/sebastian/STORAGE_HDD/data/rose_data_pc_2.csv"

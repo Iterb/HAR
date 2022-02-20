@@ -49,17 +49,17 @@ def put_interactions_on_video(
             predicted_class = predicted_classes[int(current_index)]
             cv2.rectangle(
                 frame,
-                (0, int(height-height*0.1)),
+                (0, int(height - height * 0.1)),
                 (width, height),
-                (255,255,255),
-                -1
+                (255, 255, 255),
+                -1,
             )
             cv2.putText(
                 frame,
                 f"{CLASS_DICT[predicted_class]}",
-                (15, height-5),
+                (15, height - 5),
                 0,
-                5e-3 * int(height*0.6),
+                5e-3 * int(height * 0.6),
                 (0, 0, 0),
                 1,
             )

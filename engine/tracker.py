@@ -1,13 +1,11 @@
 import sys
-import cv2
+
 import numpy as np
 
 sys.path.append(".")
+from engine.deep_sort import nn_matching, preprocessing
 from engine.deep_sort.detection import Detection
 from engine.deep_sort.tracker import Tracker as DeepTracker
-from engine.deep_sort import nn_matching
-from engine.deep_sort import preprocessing
-from utils.utils import poses2boxes
 from utils import generate_detections as gdet
 
 
@@ -27,10 +25,34 @@ class Tracker:
         )
         self.tracker = DeepTracker(metric, max_age=max_age, n_init=n_init)
 
-    def run(self, datum):
+    def create_bboxes(self, poses):
+        global seen_bodyparts
+        """
+        Parameters
+        ----------
+        poses: ndarray of human 2D poses [People * BodyPart]
+        Returns
+        ----------
+        boxes: ndarray of containing boxes [People * [x1,y1,x2,y2]]
+        """
+        boxes = []
+        for person in poses:
+            seen_bodyparts = person[np.where((person[:, 0] != 0) | (person[:, 1] != 0))]
+            mean = np.mean(seen_bodyparts, axis=0)
+            deviation = 2 * np.std(seen_bodyparts, axis=0)
+            box = [
+                int(mean[0] - deviation[0]),
+                int(mean[1] - deviation[1]),
+                int(mean[0] + deviation[0]),
+                int(mean[1] + deviation[1]),
+            ]
+            boxes.append(box)
+        return np.array(boxes)
+
+    def track(self, datum):
         keypoints, currentFrame = np.array(datum.poseKeypoints), datum.cvOutputData
         poses = self.denormalize_poses(keypoints[:, :, :2])
-        boxes = poses2boxes(poses)
+        boxes = self.create_bboxes(poses)
         boxes_xywh = [[x1, y1, x2 - x1, y2 - y1] for [x1, y1, x2, y2] in boxes]
         features = self.encoder(currentFrame, boxes_xywh)
         nonempty = lambda xywh: xywh[2] != 0 and xywh[3] != 0
