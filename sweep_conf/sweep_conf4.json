@@ -1,5 +1,5 @@
 {
-    "name": "TC-LSTM_F1_cv",
+    "name": "DC-LSTM_F1_cv",
     "method": "bayes", 
     "metric": {
         "name": "Best_val_acc",
@@ -11,10 +11,10 @@
     },
     "parameters": {
         "batch_size": {
-            "values": [64, 128, 256]
+            "values": [64, 126, 256]
         },
         "learning_rate":{
-            "values": [0.01, 0.005, 0.001, 0.0005]
+            "values": [0.01, 0.001, 0.0005, 0.0001]
         },
         "LSTM_size":{
             "values": [256, 512, 1024]
@@ -22,10 +22,11 @@
         "number_of_frames":{
             "distribution": "int_uniform",
             "min" : 10,
-            "max": 55
+            "max": 40
         },
         "dropout":{
-            "values": [0.3, 0.4, 0.5, 0.6]
+            "values": [0.3, 0.4, 0.5]
         }
+
     }
 }

@@ -1,5 +1,6 @@
 import os
 from pickle import dump
+from random import shuffle
 
 import cv2
 import pandas as pd
@@ -14,6 +15,7 @@ from utils.make_sequences import (
     create_sequences,
     create_sequences2,
     create_spaced_sequences,
+    create_spaced_sequences2,
 )
 
 
@@ -47,7 +49,10 @@ class Dataset:
         self.cfg = cfg
 
     def _process_for_single_LSTM(self):
-        if wandb.config.features_type == 1:
+        if wandb.config.features_type == 0:
+            df = pd.read_csv(self.cfg.DATASETS.FULL, dtype="float32")
+            df = df.drop(df.columns[0], axis=1)
+        elif wandb.config.features_type == 1:
             features = pd.read_csv(self.cfg.DATASETS.FEATURES_FULL, dtype="float32")
             features = features.drop(features.columns[0], axis=1)
         elif wandb.config.features_type == 2:
@@ -55,10 +60,10 @@ class Dataset:
             features = features.drop(features.columns[0], axis=1)
         elif wandb.config.features_type == 3:
             features = pd.read_csv(self.cfg.DATASETS.FEATURES3_FULL, dtype="float16")
-        # features = features.drop(features.columns[0], axis=1)
+            features = features.drop(features.columns[0], axis=1)
 
         print("loaded csvs")
-
+        # print(df)
         df = pd.concat(
             [
                 features,
@@ -68,38 +73,34 @@ class Dataset:
         )
         del features
         df = df.reset_index(drop=True)
-        # df.replace([np.inf, -np.inf], np.nan, inplace=True)
+        df.replace([np.inf, -np.inf], np.nan, inplace=True)
         df.interpolate(method="linear", inplace=True, axis=1)
 
-        # print(df.shape)
         if self.cfg.DATASETS.SPLIT_TYPE == "cs":
             full_data_train = df.loc[
                 df["subject_id"].isin(self.cfg.DATASETS.TRAIN_SUBJECTS)
-            ].astype("float32")
+            ]  # .astype("float32")
             full_data_test = df.loc[
                 ~df["subject_id"].isin(self.cfg.DATASETS.TRAIN_SUBJECTS)
-            ].astype("float32")
+            ]  # .astype("float32")
         elif self.cfg.DATASETS.SPLIT_TYPE == "cv":
             full_data_train = df.loc[
                 df["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
-            ].astype("float32")
+            ]  # .astype("float32")
             full_data_test = df.loc[
                 ~df["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
-            ].astype("float32")
+            ]  # .astype("float32")
         del df
         train_indices = np.unique(full_data_train["batch"])
         print("1")
         x_train = full_data_train.drop(
             ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        ).astype("float32")
+        )  # .astype("float32")
         # x_train = x_train.reset_index(drop=True)
         # x_train = x_train.rename(
         #     columns=dict(zip(x_train.columns, range(len(x_train.columns))))
         # ).reset_index(drop=True)
-
         print(x_train)
-        print(x_train.columns)
-        print(x_train.isnull().sum())
         x_train = pd.DataFrame(
             self.imputer.fit_transform(x_train),
             columns=x_train.columns,
@@ -114,7 +115,7 @@ class Dataset:
 
         x_test = full_data_test.drop(
             ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        ).astype("float16")
+        )  # .astype("float16")
         # x_test = x_test.reset_index(drop=True)
         x_test = x_test.rename(
             columns=dict(zip(x_test.columns, range(len(x_test.columns))))
@@ -205,13 +206,21 @@ class Dataset:
             ]
 
         train_indices = np.unique(full_data_train_per1["batch"])
-        x_train_per1 = self.scale_n_impute(full_data_train_per1)
+        x_train_per1 = self.scale_n_impute(
+            full_data_train_per1, self.scaler, self.imputer, True
+        )
 
-        x_train_per2 = self.scale_n_impute(full_data_train_per2)
+        x_train_per2 = self.scale_n_impute(
+            full_data_train_per2, self.scaler, self.imputer, False
+        )
 
-        x_test_per1 = self.scale_n_impute(full_data_test_per1)
+        x_test_per1 = self.scale_n_impute(
+            full_data_test_per1, self.scaler, self.imputer, False
+        )
 
-        x_test_per2 = self.scale_n_impute(full_data_test_per2)
+        x_test_per2 = self.scale_n_impute(
+            full_data_test_per2, self.scaler, self.imputer, False
+        )
 
         y_train = full_data_train_per1[["class"]]
         y_test = full_data_test_per1[["class"]]
@@ -257,21 +266,34 @@ class Dataset:
 
         return result
 
-    def scale_n_impute(self, data):
+    def scale_n_impute(self, data, scaler, imputer, train):
         result = data.drop(
             ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
         )
-        result = pd.DataFrame(
-            self.imputer.fit_transform(result),
-            columns=result.columns,
-            index=result.index,
-        )
+        if not train:
+            result = pd.DataFrame(
+                imputer.transform(result),
+                columns=result.columns,
+                index=result.index,
+            )
 
-        result = pd.DataFrame(
-            self.scaler.fit_transform(result),
-            columns=result.columns,
-            index=result.index,
-        )
+            result = pd.DataFrame(
+                scaler.transform(result),
+                columns=result.columns,
+                index=result.index,
+            )
+        else:
+            result = pd.DataFrame(
+                imputer.fit_transform(result),
+                columns=result.columns,
+                index=result.index,
+            )
+
+            result = pd.DataFrame(
+                scaler.fit_transform(result),
+                columns=result.columns,
+                index=result.index,
+            )
 
         result = pd.concat([result, data[["batch"]]], axis=1)
 
@@ -279,22 +301,13 @@ class Dataset:
 
     def _process_for_triple_LSTM(self):
 
-        f_p1 = pd.read_csv(self.cfg.DATASETS.FEATURES_PER1, header=None)
-        f_p2 = pd.read_csv(self.cfg.DATASETS.FEATURES_PER2, header=None)
-        dist = pd.read_csv(self.cfg.DATASETS.FEATURES_DIST, header=None)
+        f_p1 = pd.read_csv(self.cfg.DATASETS.FEATURES_PER1, index_col=[0])
+        f_p2 = pd.read_csv(self.cfg.DATASETS.FEATURES_PER2, index_col=[0])
+        dist = pd.read_csv(self.cfg.DATASETS.FEATURES_DIST, index_col=[0])
 
-        f_per1 = pd.concat(
-            [f_p1, self.data[["class", "batch", "camera_id", "subject_id", "R_id"]]],
-            axis=1,
-        )
-        f_per2 = pd.concat(
-            [f_p2, self.data[["class", "batch", "camera_id", "subject_id", "R_id"]]],
-            axis=1,
-        )
-        distance = pd.concat(
-            [dist, self.data[["class", "batch", "camera_id", "subject_id", "R_id"]]],
-            axis=1,
-        )
+        f_per1 = self._fix_dataframe(f_p1)
+        f_per2 = self._fix_dataframe(f_p2)
+        distance = self._fix_dataframe(dist)
 
         if self.cfg.DATASETS.SPLIT_TYPE == "cs":
             full_data_train_per1 = f_per1.loc[
@@ -312,6 +325,10 @@ class Dataset:
             full_data_train_dist = distance.loc[
                 distance["subject_id"].isin(self.cfg.DATASETS.TRAIN_SUBJECTS)
             ]
+            full_data_test_dist = distance.loc[
+                ~distance["subject_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
+            ]
+
         elif self.cfg.DATASETS.SPLIT_TYPE == "cv":
             full_data_train_per1 = f_per1.loc[
                 f_per1["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
@@ -325,112 +342,39 @@ class Dataset:
             full_data_test_per2 = f_per2.loc[
                 ~f_per2["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
             ]
+            full_data_train_dist = distance.loc[
+                distance["camera_id"].isin(self.cfg.DATASETS.TRAIN_SUBJECTS)
+            ]
             full_data_test_dist = distance.loc[
                 ~distance["camera_id"].isin(self.cfg.DATASETS.TRAIN_CAMERAS)
             ]
 
         train_indices = np.unique(full_data_train_per1["batch"])
 
-        x_train_per1 = full_data_train_per1.drop(
-            ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        )
-        self.imputer.fit(x_train_per1)
-        self.scaler.fit(x_train_per1)
-        x_train_per1 = pd.DataFrame(
-            self.imputer.transform(x_train_per1),
-            columns=x_train_per1.columns,
-            index=x_train_per1.index,
-        )
-        x_train_per1 = pd.DataFrame(
-            self.scaler.transform(x_train_per1),
-            columns=x_train_per1.columns,
-            index=x_train_per1.index,
-        )
-        x_train_per1 = pd.concat(
-            [x_train_per1, full_data_train_per1[["batch"]]], axis=1
+        x_train_per1 = self.scale_n_impute(
+            full_data_train_per1, self.scaler, self.imputer, True
         )
 
-        x_train_per2 = full_data_train_per2.drop(
-            ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        )
-        x_train_per2 = pd.DataFrame(
-            self.imputer.transform(x_train_per2),
-            columns=x_train_per2.columns,
-            index=x_train_per2.index,
-        )
-        x_train_per2 = pd.DataFrame(
-            self.scaler.transform(x_train_per2),
-            columns=x_train_per2.columns,
-            index=x_train_per2.index,
-        )
-        x_train_per2 = pd.concat(
-            [x_train_per2, full_data_train_per2[["batch"]]], axis=1
+        x_train_per2 = self.scale_n_impute(
+            full_data_train_per2, self.scaler, self.imputer, False
         )
 
-        x_train_dist = full_data_train_dist.drop(
-            ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        )
-        self.imputer_dist.fit(x_train_dist)
-        self.scaler_dist.fit(x_train_dist)
-        x_train_dist = pd.DataFrame(
-            self.imputer_dist.transform(x_train_dist),
-            columns=x_train_dist.columns,
-            index=x_train_dist.index,
-        )
-        x_train_dist = pd.DataFrame(
-            self.scaler_dist.transform(x_train_dist),
-            columns=x_train_dist.columns,
-            index=x_train_dist.index,
-        )
-        x_train_dist = pd.concat(
-            [x_train_dist, full_data_train_dist[["batch"]]], axis=1
+        x_test_per1 = self.scale_n_impute(
+            full_data_test_per1, self.scaler, self.imputer, False
         )
 
-        x_test_per1 = full_data_test_per1.drop(
-            ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
+        x_test_per2 = self.scale_n_impute(
+            full_data_test_per2, self.scaler, self.imputer, False
         )
-        x_test_per1 = pd.DataFrame(
-            self.imputer_dist.transform(x_test_per1),
-            columns=x_test_per1.columns,
-            index=x_test_per1.index,
+        x_train_dist = self.scale_n_impute(
+            full_data_train_dist, self.scaler_dist, self.imputer_dist, True
         )
-        x_test_per1 = pd.DataFrame(
-            self.scaler_dist.transform(x_test_per1),
-            columns=x_test_per1.columns,
-            index=x_test_per1.index,
+        x_test_dist = self.scale_n_impute(
+            full_data_test_dist, self.scaler_dist, self.imputer_dist, False
         )
-        x_test_per1 = pd.concat([x_test_per1, full_data_test_per1[["batch"]]], axis=1)
 
-        x_test_per2 = full_data_test_per2.drop(
-            ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        )
-        x_test_per2 = pd.DataFrame(
-            self.imputer_dist.transform(x_test_per2),
-            columns=x_test_per2.columns,
-            index=x_test_per2.index,
-        )
-        x_test_per2 = pd.DataFrame(
-            self.scaler_dist.transform(x_test_per2),
-            columns=x_test_per2.columns,
-            index=x_test_per2.index,
-        )
-        x_test_per2 = pd.concat([x_test_per2, full_data_test_per2[["batch"]]], axis=1)
-
-        x_test_dist = full_data_test_dist.drop(
-            ["class", "batch", "camera_id", "subject_id", "R_id"], axis=1
-        )
-        x_test_dist = pd.DataFrame(
-            self.imputer_dist.transform(x_test_dist),
-            columns=x_test_dist.columns,
-            index=x_test_dist.index,
-        )
-        x_test_dist = pd.DataFrame(
-            self.scaler_dist.transform(x_test_dist),
-            columns=x_test_dist.columns,
-            index=x_test_dist.index,
-        )
-        x_test_dist = pd.concat([x_test_dist, full_data_test_dist[["batch"]]], axis=1)
-
+        print(x_train_dist)
+        print(x_test_dist)
         y_train = full_data_train_per1[["class"]]
         y_test = full_data_test_per1[["class"]]
 
@@ -521,7 +465,6 @@ class Dataset:
         x_train = self.scale_n_impute(full_data_train).drop(["batch"], axis=1)
         img_size = 24
         pad_size = (img_size ** 2 - 450) / 2
-        print(pad_size)
         pad_size = 63
         x_train_2D = x_train.apply(
             lambda row: np.pad(row.to_numpy(), (pad_size, pad_size)).reshape(
@@ -643,7 +586,6 @@ class Dataset:
         x_train = self.scale_n_impute(full_data_train).drop(["batch"], axis=1)
         img_size = 24
         pad_size = (img_size ** 2 - 450) / 2
-        print(pad_size)
         pad_size = 63
         x_train_2D = x_train.apply(
             lambda row: np.pad(row.to_numpy(), (pad_size, pad_size)).reshape(
@@ -816,36 +758,40 @@ class Dataset:
                 y_test,
                 train_batches,
             ) = self._process_for_triple_LSTM()
-            X_train_seq_per1, y_train_seq, X_train_dist_seq = create_spaced_sequences(
+            X_train_seq_per1, y_train_seq, X_train_dist_seq = create_spaced_sequences2(
                 x_train_per1,
                 y_train,
                 x_train_dist,
                 wandb.config.number_of_frames,
                 train_batches,
+                self.cfg,
             )
-            X_train_seq_per2, _, _ = create_spaced_sequences(
+            X_train_seq_per2, _, _ = create_spaced_sequences2(
                 x_train_per2,
                 y_train,
                 x_train_dist,
                 wandb.config.number_of_frames,
                 train_batches,
+                self.cfg,
             )
             test_batches = [
                 batch for batch in all_batches if batch not in train_batches
             ]
-            X_test_seq_per1, y_test_seq, X_test_dist_seq = create_spaced_sequences(
+            X_test_seq_per1, y_test_seq, X_test_dist_seq = create_spaced_sequences2(
                 x_test_per1,
                 y_test,
                 x_test_dist,
                 wandb.config.number_of_frames,
                 test_batches,
+                self.cfg,
             )
-            X_test_seq_per2, _, _ = create_spaced_sequences(
+            X_test_seq_per2, _, _ = create_spaced_sequences2(
                 x_test_per2,
                 y_test,
                 x_test_dist,
                 wandb.config.number_of_frames,
                 test_batches,
+                self.cfg,
             )
 
             return (
@@ -876,3 +822,40 @@ class Dataset:
                 y_train,
                 y_test,
             )
+
+    # def _process_for_single_LSTM(self):
+    #     # Załadowanie odpowiednich cech z pliku csv
+    #     if wandb.config.features_type == LIMB_ANGLE:
+    #         features = pd.read_csv(self.cfg.DATASETS.FEATURES_FULL, dtype="float32")
+    #     [...]
+
+    #     # Uzupełnianie brakujących złączy na podstawi
+    #     features = fill_missing_features(self.averge_features)
+
+    #     # Podzielenie na zbiór testujący i traingowy według zaleceń autorów zbioru NTU
+    #     splitter = (
+    #         self.cfg.DATASETS.TRAIN_SUBJECTS
+    #         if self.cfg.DATASETS.SPLIT_TYPE == CROSS_SUBJECT
+    #         else self.cfg.DATASETS.TRAIN_CAMERAS
+    #     )
+
+    #     full_train_set = features.loc[features["subject_id"].isin(splitter)]
+    #     test_set = features.loc[~features["subject_id"].isin(splitter)]
+
+    #     # Wyznaczenie zbioru walidacyjego jako 20% uczącego
+    #     train_set, val_set = train_test_split(
+    #         full_train_set, test_size=0.2, shuffle=False
+    #     )
+
+    #     train_indices = np.unique(train_set["batch"])
+
+    #     # Wydzielenie cech uczących oraz etykiet z oryginalnych DataFrame
+    #     x_train = train_set.drop(["class", "camera_id", "subject_id", "R_id"], axis=1)
+    #     x_test = test_set.drop(["class", "camera_id", "subject_id", "R_id"], axis=1)
+    #     x_val = val_set.drop(["class", "camera_id", "subject_id", "R_id"], axis=1)
+    #     y_train = train_set[["class"]]
+    #     y_test = test_set[["class"]]
+    #     y_val = val_set[["class"]]
+    #     [...]
+
+    #     return x_train, x_test, x_val, y_train, y_test, y_val, train_indices

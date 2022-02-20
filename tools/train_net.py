@@ -6,6 +6,7 @@ import sys
 from os import mkdir
 
 import wandb
+from keras.utils.vis_utils import plot_model
 
 sys.path.append(".")
 from config import cfg
@@ -13,8 +14,7 @@ from data.dataset import Dataset
 from engine.trainer import do_train
 from engine.test import do_test
 from engine.summarize import summarize
-from modeling import SingleLSTM, DoubleLSTM, ConvNet
-
+from modeling import SingleLSTM, DoubleLSTM,TripleLSTM, ConvNet, CNN3D
 from utils.logger import setup_logger
 from utils.wandblog import setup_wandb_logger
 
@@ -45,25 +45,44 @@ def train(cfg):
             cfg,
         )
     elif cfg.MODEL.ARCH == "triple":
-        pass
+        (
+            X_train_seq_per1,
+            X_train_seq_per2,
+            X_train_dist_seq,
+            X_test_seq_per1,
+            X_test_seq_per2,
+            X_test_dist_seq,
+            y_train_seq,
+            y_test_seq,
+        ) = data
+        model = TripleLSTM.build_model(
+            X_train_seq_per1.shape[1],
+            X_train_seq_per2.shape[2],
+            y_train_seq.shape[1],
+            X_train_dist_seq.shape[2],
+            cfg,
+        )
     elif cfg.MODEL.ARCH == "convnet":
         model = ConvNet.build_model(
             (24, 24, wandb.config.number_of_frames, 1),
             11,
             cfg,
         )
-    elif cfg.MODEL.ARCH == "3DCNN":
-        model = ConvNet.build_model(
+    elif cfg.MODEL.ARCH == "CNN3D":
+        model = CNN3D.build_model(
             (24, 24, wandb.config.number_of_frames, 1),
             11,
             cfg,
         )
-
+   
     model = do_train(
         cfg,
         model,
         data,
     )
+    print(model.summary())
+    plot_model(model, to_file='model_plot.png', show_shapes=True, show_layer_names=True)
+
     score = do_test(cfg, model, data)
     summarize(
         cfg,

@@ -12,7 +12,7 @@ from data.dataset import Dataset
 from engine.sweeper import do_sweep
 from engine.test import do_test
 from engine.summarize import summarize
-from modeling import SingleLSTM, DoubleLSTM
+from modeling import SingleLSTM, DoubleLSTM, TripleLSTM
 
 from utils.logger import setup_logger
 from utils.wandblog import setup_wandb_logger
@@ -45,19 +45,34 @@ def train():
             cfg,
         )
     elif cfg.MODEL.ARCH == "triple":
-        pass
-
+        (
+            X_train_seq_per1,
+            X_train_seq_per2,
+            X_train_dist_seq,
+            X_test_seq_per1,
+            X_test_seq_per2,
+            X_test_dist_seq,
+            y_train_seq,
+            y_test_seq,
+        ) = data
+        model = TripleLSTM.build_model(
+            X_train_seq_per1.shape[1],
+            X_train_seq_per2.shape[2],
+            y_train_seq.shape[1],
+            X_train_dist_seq.shape[2],
+            cfg,
+        )
     do_sweep(
         cfg,
         model,
         data,
     )
     score = do_test(cfg, model, data)
-    # summarize(
-    #     cfg,
-    #     model,
-    #     data,
-    # )
+    summarize(
+        cfg,
+        model,
+        data,
+    )
 
 
 def main():
@@ -97,7 +112,7 @@ def main():
             logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
 
-    with open("sweep_conf/sweep_conf3.json", "r") as f:
+    with open("sweep_conf/sweep_conf.json", "r") as f:
         sweep_config = json.load(f)
 
     try:

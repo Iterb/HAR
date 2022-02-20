@@ -13,7 +13,7 @@ import yacs
 
 from engine.tracker import Tracker
 from utils.utils import poses2boxes
-
+import timeit
 FEATURES_TYPE_1 = 1
 FEATURES_TYPE_2 = 2
 FEATURES_TYPE_3 = 3
@@ -165,6 +165,7 @@ def process_video(
         height = int(cap.get(4))  # float `height`
         tracker = Tracker(cfg, width, height)
     print(start_frame, end_frame)
+    starttime = timeit.default_timer()
     while True:
         # Capture frame-by-frame
         current_frame_number += 1
@@ -185,9 +186,9 @@ def process_video(
             if do_track:
                 for track in tracks:
                     color = None
-                    color = (0, 0, 255) if not track.is_confirmed() else (255, 255, 255)
+                    color = (255, 255, 255)
                     bbox = track.to_tlbr()
-                    print(bbox)
+                    #print(bbox)
                     cv2.rectangle(
                         currentFrame,
                         (int(bbox[0]), int(bbox[1])),
@@ -197,12 +198,12 @@ def process_video(
                     )
                     cv2.putText(
                         currentFrame,
-                        "id%s - ts%s" % (track.track_id, track.time_since_update),
-                        (int(bbox[0]), int(bbox[1]) - 20),
+                        "id%s" % (track.track_id),
+                        (int(bbox[0]) + int((int(bbox[2]) - int(bbox[0])) / 2)  - 5, int(bbox[1]) + 20),
                         0,
-                        5e-3 * 200,
-                        (0, 255, 0),
-                        2,
+                        5e-3 * 100,
+                        (255, 255, 255),
+                        1,
                     )
             cv2.imshow("OpenPose 1.7.0 - Tutorial Python API", currentFrame)
         if datum.poseKeypoints.shape[0] >= 2:  ## FIX THAT
@@ -212,9 +213,12 @@ def process_video(
             out.write(currentFrame.astype("uint8"))
         if cv2.waitKey(1) & 0xFF == ord("q"):
             break
+        #print()
     cap.release()
     if save_output:
         out.release()
+    time_delta =  timeit.default_timer() - starttime
+    print(f"The time difference is : {time_delta} for {end_frame- start_frame} frames which eq to {(end_frame- start_frame)/time_delta} FPS")
 
     return pose_frame_data
 
@@ -277,8 +281,6 @@ def calculate_stacked_preditions(window_duration: int, window_offset: int, preds
 
     average_stacked_predictions = np.divide(stacked_predictions, divider.reshape(-1, 1))
 
-    print(divider)
-    print(np.sum(average_stacked_predictions))
 
     return average_stacked_predictions
 
@@ -330,16 +332,19 @@ def calculate_limb_lengths(x_coords, average_LIMBS, average_norm):
     for frame in x_coords:
         x_person = []
         if (np.any(frame[1] == 0)) or (np.any(frame[8] == 0)):
-            norm = average_norm
+            norm = 1 #average_norm
         else:
             norm = np.linalg.norm(frame[1] - frame[8])
 
         # x_person.append(1)
         for i, limb in enumerate(LIMBS):
             if (np.any(frame[limb[0]] == 0)) or (np.any(frame[limb[1]] == 0)):
-                l = average_LIMBS[i]
+                l = 1 #average_LIMBS[i]
             else:
-                l = np.linalg.norm(frame[limb[0]] - frame[limb[1]]) / norm
+                try:
+                    l = np.linalg.norm(frame[limb[0]] - frame[limb[1]]) / norm
+                except:
+                    l = 1
             x_person.append(l)
         x_lengths.append(x_person)
     return x_lengths
@@ -362,7 +367,7 @@ def calculate_angles(x_coords, average_ang):
                 or np.any(frame[angle[1]] == 0)
                 or np.any(frame[angle[2]] == 0)
             ):
-                a = average_ang[i]
+                a = 1# average_ang[i]
             else:
                 a = calculate_angle(frame[angle[0]], frame[angle[1]], frame[angle[2]])
             x_person.append(a)

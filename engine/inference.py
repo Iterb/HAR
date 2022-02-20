@@ -1,16 +1,11 @@
 import logging
 from pickle import load
-import datetime
 from collections import deque
-
-import wandb
-import tensorflow as tf
+from pathlib import Path
 import numpy as np
-from sklearn import preprocessing
-from sklearn.impute import SimpleImputer
-import onnx
 import onnxruntime as rt
 import pandas as pd
+from timeit import default_timer as timer
 
 FEATURES_TYPE_1 = 1
 FEATURES_TYPE_2 = 2
@@ -24,15 +19,20 @@ def do_inference(
     cfg,
     data,
 ):
-
+    start_loading_model = timer()
     m = rt.InferenceSession(cfg.INFER.MODEL_PATH)
+    end_loading_model = timer()
+    start_preprocess = timer()
     features = preprocess(cfg, data)
+    end_preprocess = timer()
     logger = logging.getLogger("model.infer")
     logger.info("Start inferencing")
     input_name = m.get_inputs()[0].name
     label_name = m.get_outputs()[0].name
+    start_infer = timer()
     features = features[0].astype(np.float32).reshape(-1, cfg.INFER.WINDOW_SIZE, 60)
     onnx_pred = m.run([label_name], {input_name: features})
+    end_infer = timer()
     class_dict = {
         0: "punch",
         1: "kicking",
@@ -49,17 +49,22 @@ def do_inference(
     preds = np.argmax((onnx_pred), axis=2)
     for p in preds[0]:
         print(class_dict[p])
+    print("Time spent report:")
+    print(f"Time spent loading model: {end_loading_model-start_loading_model}")
+    print(f"Time spent preprocess: {end_preprocess-start_preprocess}")
+    print(f"Time spent inferencing: {end_infer-start_infer}")
+    print(f"Overall: {end_infer-start_loading_model}")
     logger.info("Finished Testing")
     return onnx_pred
 
 
 def preprocess(cfg, data):
     scaler = load(
-        open(f"sklearn/{cfg.MODEL.ARCH}_F{cfg.DATASETS.FEATURES_TYPE}_scaler.pkl", "rb")
+        open(f"sklearn/{cfg.INFER.ARCH}_F{cfg.INFER.FEATURES_TYPE}_scaler.pkl", "rb")
     )
     imputer = load(
         open(
-            f"sklearn/{cfg.MODEL.ARCH}_F{cfg.DATASETS.FEATURES_TYPE}_imputer.pkl", "rb"
+            f"sklearn/{cfg.INFER.ARCH}_F{cfg.INFER.FEATURES_TYPE}_imputer.pkl", "rb"
         )
     )
     seq_type = "linspace"
@@ -107,13 +112,13 @@ def preprocess(cfg, data):
     if cfg.INFER.ARCH == TRIPLE_LSTM:
         scaler_dist = load(
             open(
-                f"sklearn/{cfg.MODEL.ARCH}_F{cfg.DATASETS.FEATURES_TYPE}_scaler_dist.pkl",
+                f"sklearn/{cfg.INFER.ARCH}_F{cfg.INFER.FEATURES_TYPE}_scaler_dist.pkl",
                 "rb",
             )
         )
         imputer_dist = load(
             open(
-                f"sklearn/{cfg.MODEL.ARCH}_F{cfg.DATASETS.FEATURES_TYPE}_imputer_dist.pkl",
+                f"sklearn/{cfg.INFER.ARCH}_F{cfg.INFER.FEATURES_TYPE}_imputer_dist.pkl",
                 "rb",
             )
         )

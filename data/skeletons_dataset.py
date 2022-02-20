@@ -101,7 +101,13 @@ class SkeletonDataset:
     @staticmethod
     def create_volume(image_paths: np.ndarray):
         return np.array(
-            [cv2.imread(str(image_path), -1) for image_path in image_paths] 
+            [
+                cv2.resize
+                (
+                    cv2.imread(str(image_path), -1),
+                    (64, 64)
+                ) for image_path in image_paths
+            ]  
         )
             
             
@@ -110,18 +116,15 @@ class SkeletonDataset:
         # read data
 
         image_paths =np.array(self.image_paths[i])
-        print(image_paths)
         indices = np.linspace(0, len(image_paths) - 1, self.linspace_size, dtype=np.int)
         image_paths_norm_len = image_paths[indices]
         image_volume = self.create_volume(image_paths_norm_len)
         target = self.targets[i]
         target = tf.keras.utils.to_categorical(target, 11)
-        print(image_volume)
-        print(image_volume.shape)
         return image_volume.astype("float32"), target
 
     def __len__(self):
-        return len(self.y_data)
+        return len(self.targets)
 
 
 def default_collate_fn(samples):

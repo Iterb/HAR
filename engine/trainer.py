@@ -58,6 +58,7 @@ def do_train(
     ]
     if cfg.MODEL.ARCH == "single":
         X_train_seq, y_train_seq, X_test_seq, y_test_seq = data
+        print(y_train_seq.shape)
         history = model.fit(
             X_train_seq,
             y_train_seq,
@@ -67,6 +68,7 @@ def do_train(
             callbacks=callbacks,
         )
     elif cfg.MODEL.ARCH == "double":
+        
         (
             X_train_seq_per1,
             X_train_seq_per2,
@@ -75,6 +77,7 @@ def do_train(
             X_test_seq_per2,
             y_test_seq,
         ) = data
+        print(y_train_seq.shape)
         history = model.fit(
             [X_train_seq_per1, X_train_seq_per2],
             y_train_seq,
@@ -133,7 +136,7 @@ def do_train(
             validation_data=val_dataloader,
             callbacks=callbacks,
         )
-    elif cfg.MODEL.ARCH == "3DCNN":
+    elif cfg.MODEL.ARCH == "CNN3D":
         train_instances = (
             cfg.DATASETS.TRAIN_CAMERAS
             if cfg.DATASETS.SPLIT_TYPE == "cv"
@@ -144,9 +147,30 @@ def do_train(
             imgs_root_dir=cfg.DATASETS.SKELETON_IMGS,
             train_instances=train_instances,
             data_split=cfg.DATASETS.SPLIT_TYPE,
+            train = True,
+        )
+        val_dataset = SkeletonDataset(
+            linspace_size=wandb.config.number_of_frames,
+            imgs_root_dir=cfg.DATASETS.SKELETON_IMGS,
+            train_instances=train_instances,
+            data_split=cfg.DATASETS.SPLIT_TYPE,
             train = False,
         )
-        print(train_dataset[5])
+        train_dataloader = ConvnetDataloader(
+            dataset=train_dataset, batch_size=wandb.config.batch_size, shuffle=True
+        )
+
+        val_dataloader = ConvnetDataloader(
+            dataset=val_dataset, batch_size=1, shuffle=False
+        )
+        history = model.fit(
+            train_dataloader,
+            batch_size=batch_size,
+            epochs=epochs,
+            # validation_data=val_dataloader,
+            callbacks=callbacks,
+        )
+
     # model = keras.models.load_model(filepath)
     # trained_model_artifact = wandb.Artifact(
     #     model_name,

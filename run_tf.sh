@@ -8,6 +8,6 @@ docker run --rm -it\
 	--ipc=host \
 	--device=/dev/video0:/dev/video0 \
 	-v $(pwd):/workspace \
-	-v /media/sebastian/STORAGE_HDD2/data/:/media/sebastian/STORAGE_HDD/data/ \
+	-v /media/sebastian/STORAGE_HDD9/data/:/media/sebastian/STORAGE_HDD/data/ \
 	-w /workspace \
 	har:latest /bin/bash

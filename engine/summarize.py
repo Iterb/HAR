@@ -11,8 +11,10 @@ def create_wandb_table(classification_report: Dict[str, Dict[str, float]])->wand
     columns = ["class"] + list(classification_report['punch'].keys())
     table = wandb.Table(columns=columns)
     for _class, values in classification_report.items():
-        metric_values = list(values.keys())
-        table.add_data(_class, metric_values[0],metric_values[1],metric_values[2],metric_values[3])
+        if isinstance(values, float):
+            continue
+        metric_values = list(values.values())
+        table.add_data(_class, *metric_values)
 
     return table
 def summarize(

@@ -34,34 +34,39 @@ def put_interactions_on_video(
     current_frame_number = -1
     predicted_classes = np.argmax(interactions, axis=1)
 
-    print(predicted_classes)
-
+    width = int(cap.get(3))  # float `width`
+    height = int(cap.get(4))  # float `height`
     while True:
+        if cv2.waitKey(1) & 0xFF == ord("q"):
+            break
+        # Capture frame-by-frame
+        current_frame_number += 1
+        ret, frame = cap.read()
+        current_second = np.floor(current_frame_number / fps)
+        current_index = window_offset * current_second
+        print(current_index)
         try:
-            if cv2.waitKey(1) & 0xFF == ord("q"):
-                break
-            # Capture frame-by-frame
-            current_frame_number += 1
-            ret, frame = cap.read()
-            current_second = np.floor(current_frame_number / fps)
-            current_index = window_offset * current_second
-            print(current_index)
             predicted_class = predicted_classes[int(current_index)]
-
+            cv2.rectangle(
+                frame,
+                (0, int(height-height*0.1)),
+                (width, height),
+                (255,255,255),
+                -1
+            )
             cv2.putText(
                 frame,
                 f"{CLASS_DICT[predicted_class]}",
-                (80, 80),
+                (15, height-5),
                 0,
-                5e-3 * 200,
-                (0, 255, 0),
-                2,
+                5e-3 * int(height*0.6),
+                (0, 0, 0),
+                1,
             )
             # cv2.imshow("Out", frame)
             out.write(frame)
-
         except:
-            pass
+            break
     cap.release()
     out.release()
     cv2.destroyAllWindows()

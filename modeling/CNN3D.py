@@ -15,7 +15,7 @@ from tensorflow.keras.models import Sequential
 
 
 
-class 3DCNN:
+class CNN3D:
     """https://www.dbs.ifi.lmu.de/~yu_k/icml2010_3dcnn.pdf"""
 
     def build_model(input_shape, n_outputs, cfg):
@@ -27,11 +27,11 @@ class 3DCNN:
                 ),
                 MaxPooling3D(pool_size=(2, 2, 1)),
                 Conv3D(
-                    46, kernel_size=(7 6, 3), padding = 'valid', activation="relu"
+                    46, kernel_size=(7, 6, 3), padding = 'valid', activation="relu"
                 ),
                 MaxPooling3D(pool_size=(3, 3, 1)),
-                Conv2D(
-                    78, kernel_size=(3, 3), padding = 'same', activation="relu"
+                Conv3D(
+                    78, kernel_size=(3, 3, 1), padding = 'same', activation="relu"
                 ),
                 Flatten(),
                 Dense(128, activation="relu"),
